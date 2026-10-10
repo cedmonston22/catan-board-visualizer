@@ -24,11 +24,23 @@ def build_remap(names: list[str]) -> dict[int, int]:
 
 
 def read_labels(label_path: Path) -> list[tuple[int, float, float, float, float]]:
-    ...
+    labels = []
+    for line in label_path.read_text().splitlines():
+        parts = line.split()
+        if not parts:
+            continue
+        cls, cx, cy, w, h = parts
+        labels.append((int(cls), float(cx), float(cy), float(w), float(h)))
+    return labels
 
 
 def to_pixels(box: tuple[float, float, float, float], w: int, h: int) -> tuple[int, int, int, int]:
-    ...
+    cx, cy, bw, bh = box
+    left_edge = max(0, min(int((cx - bw / 2) * w), w))
+    right_edge = max(0, min(int((cx + bw / 2) * w), w))
+    top_edge = max(0, min(int((cy - bh / 2) * h), h))
+    bottom_edge = max(0, min(int((cy + bh / 2) * h), h))
+    return left_edge, top_edge, right_edge, bottom_edge
 
 
 def fraction_inside(box, region) -> float:
