@@ -1,4 +1,3 @@
-import json
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -8,11 +7,12 @@ from ultralytics import YOLO
 
 from board import Board, build_board, edge_midpoint
 from click_corners import OUT, load_saved
-from color import COLORS, REFS, classify
 from extract_crops import PAD, crop_box
 from rectify import TILE_SIZE, compute_homography, find_image, warp
 
 WEIGHTS = Path("runs/detect/catan_v2/weights/best.pt")
+COLOR_WEIGHTS = Path("runs/classify/colors_v1/weights/best.pt")
+COLOR_IMGSZ = 128
 IMGSZ = 1024
 CONF = 0.25
 BASE_FRACTION = 0.75
@@ -49,19 +49,21 @@ def detect(model: YOLO, image_path: Path) -> list[Detection]:
     ]
 
 
-def load_refs() -> dict[str, np.ndarray]:
-    return {color: np.array(ref, dtype=np.float32) for color, ref in json.loads(REFS.read_text()).items()}
-
-
-def color_detections(detections: list[Detection], image: np.ndarray, refs: dict[str, np.ndarray]) -> None:
+def color_detections(detections: list[Detection], image: np.ndarray, color_model: YOLO) -> None:
+    targets, crops = [], []
     for det in detections:
         if det.piece == "robber":
             continue
-        box = tuple(int(v) for v in det.box)
-        crop = crop_box(image, box, PAD)
+        crop = crop_box(image, tuple(int(v) for v in det.box), PAD)
         if crop.size == 0:
             continue
-        det.color = classify(crop, refs)[0]
+        targets.append(det)
+        crops.append(crop)
+    if not crops:
+        return
+    results = color_model.predict(crops, imgsz=COLOR_IMGSZ, verbose=False)
+    for det, result in zip(targets, results):
+        det.color = result.names[result.probs.top1]
 
 
 def anchor_point(det: Detection) -> tuple[float, float]:
@@ -188,13 +190,13 @@ def main() -> None:
         print(f"no corners in {OUT}, run click_corners.py first")
         return
 
-    if not REFS.exists():
-        print(f"no color references at {REFS}, run color.py first")
+    if not COLOR_WEIGHTS.exists():
+        print(f"no color classifier at {COLOR_WEIGHTS}, run train_color.py first")
         return
 
     model = YOLO(str(WEIGHTS))
+    color_model = YOLO(str(COLOR_WEIGHTS))
     board = build_board()
-    refs = load_refs()
     OUTPUT.mkdir(parents=True, exist_ok=True)
 
     for pid, clicked in corners.items():
@@ -202,7 +204,7 @@ def main() -> None:
         image = cv2.imread(str(image_path))
         homography = compute_homography(clicked)
         detections = detect(model, image_path)
-        color_detections(detections, image, refs)
+        color_detections(detections, image, color_model)
         snapped = snap(detections, homography, board)
         placements = resolve_conflicts(snapped)
 
