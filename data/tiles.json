@@ -1,0 +1,236 @@
+{
+ "1": [
+  {
+   "resource": "wood",
+   "number": 4
+  },
+  {
+   "resource": "wood",
+   "number": 6
+  },
+  {
+   "resource": "brick",
+   "number": 4
+  },
+  {
+   "resource": "sheep",
+   "number": 10
+  },
+  {
+   "resource": "wheat",
+   "number": 10
+  },
+  {
+   "resource": "ore",
+   "number": 9
+  },
+  {
+   "resource": "sheep",
+   "number": 6
+  },
+  {
+   "resource": "wheat",
+   "number": 8
+  },
+  {
+   "resource": "ore",
+   "number": 5
+  },
+  {
+   "resource": "brick",
+   "number": 11
+  },
+  {
+   "resource": "wheat",
+   "number": 3
+  },
+  {
+   "resource": "wheat",
+   "number": 5
+  },
+  {
+   "resource": "sheep",
+   "number": 9
+  },
+  {
+   "resource": "wood",
+   "number": 3
+  },
+  {
+   "resource": "sheep",
+   "number": 2
+  },
+  {
+   "resource": "desert",
+   "number": null
+  },
+  {
+   "resource": "ore",
+   "number": 12
+  },
+  {
+   "resource": "brick",
+   "number": 8
+  },
+  {
+   "resource": "wood",
+   "number": 11
+  }
+ ],
+ "2": [
+  {
+   "resource": "desert",
+   "number": null
+  },
+  {
+   "resource": "wheat",
+   "number": 10
+  },
+  {
+   "resource": "wood",
+   "number": 9
+  },
+  {
+   "resource": "wheat",
+   "number": 5
+  },
+  {
+   "resource": "ore",
+   "number": 8
+  },
+  {
+   "resource": "wood",
+   "number": 4
+  },
+  {
+   "resource": "sheep",
+   "number": 8
+  },
+  {
+   "resource": "sheep",
+   "number": 2
+  },
+  {
+   "resource": "wood",
+   "number": 12
+  },
+  {
+   "resource": "brick",
+   "number": 10
+  },
+  {
+   "resource": "brick",
+   "number": 11
+  },
+  {
+   "resource": "wood",
+   "number": 3
+  },
+  {
+   "resource": "brick",
+   "number": 6
+  },
+  {
+   "resource": "wheat",
+   "number": 11
+  },
+  {
+   "resource": "ore",
+   "number": 9
+  },
+  {
+   "resource": "wheat",
+   "number": 6
+  },
+  {
+   "resource": "sheep",
+   "number": 5
+  },
+  {
+   "resource": "sheep",
+   "number": 3
+  },
+  {
+   "resource": "ore",
+   "number": 4
+  }
+ ],
+ "3": [
+  {
+   "resource": "brick",
+   "number": 9
+  },
+  {
+   "resource": "sheep",
+   "number": 6
+  },
+  {
+   "resource": "sheep",
+   "number": 2
+  },
+  {
+   "resource": "wheat",
+   "number": 11
+  },
+  {
+   "resource": "wood",
+   "number": 10
+  },
+  {
+   "resource": "wheat",
+   "number": 5
+  },
+  {
+   "resource": "wheat",
+   "number": 8
+  },
+  {
+   "resource": "brick",
+   "number": 12
+  },
+  {
+   "resource": "desert",
+   "number": null
+  },
+  {
+   "resource": "ore",
+   "number": 6
+  },
+  {
+   "resource": "ore",
+   "number": 3
+  },
+  {
+   "resource": "wood",
+   "number": 4
+  },
+  {
+   "resource": "brick",
+   "number": 8
+  },
+  {
+   "resource": "wood",
+   "number": 4
+  },
+  {
+   "resource": "sheep",
+   "number": 11
+  },
+  {
+   "resource": "wheat",
+   "number": 10
+  },
+  {
+   "resource": "sheep",
+   "number": 3
+  },
+  {
+   "resource": "ore",
+   "number": 9
+  },
+  {
+   "resource": "wood",
+   "number": 5
+  }
+ ]
+}
