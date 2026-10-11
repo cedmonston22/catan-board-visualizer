@@ -1,3 +1,4 @@
+import json
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -7,6 +8,8 @@ from ultralytics import YOLO
 
 from board import Board, build_board, edge_midpoint
 from click_corners import OUT, load_saved
+from color import COLORS, REFS, classify
+from extract_crops import PAD, crop_box
 from rectify import TILE_SIZE, compute_homography, find_image, warp
 
 WEIGHTS = Path("runs/detect/catan_v2/weights/best.pt")
@@ -22,6 +25,7 @@ class Detection:
     piece: str
     conf: float
     box: tuple[float, float, float, float]
+    color: str | None = None
 
 
 @dataclass
@@ -31,6 +35,7 @@ class Placement:
     kind: str
     target: int
     distance: float
+    color: str | None = None
 
 
 def detect(model: YOLO, image_path: Path) -> list[Detection]:
@@ -42,6 +47,21 @@ def detect(model: YOLO, image_path: Path) -> list[Detection]:
         Detection(piece=result.names[int(cls)], conf=conf, box=tuple(box))
         for box, cls, conf in zip(boxes, classes, confs)
     ]
+
+
+def load_refs() -> dict[str, np.ndarray]:
+    return {color: np.array(ref, dtype=np.float32) for color, ref in json.loads(REFS.read_text()).items()}
+
+
+def color_detections(detections: list[Detection], image: np.ndarray, refs: dict[str, np.ndarray]) -> None:
+    for det in detections:
+        if det.piece == "robber":
+            continue
+        box = tuple(int(v) for v in det.box)
+        crop = crop_box(image, box, PAD)
+        if crop.size == 0:
+            continue
+        det.color = classify(crop, refs)[0]
 
 
 def anchor_point(det: Detection) -> tuple[float, float]:
@@ -86,7 +106,7 @@ def snap(detections: list[Detection], homography: np.ndarray, board: Board) -> l
         kind = piece_kind[detect.piece]
         index, distance = nearest(point, candidates_for[kind])
         if distance <= MAX_SNAP:
-            placements.append(Placement(detect.piece, detect.conf, kind, index, distance))
+            placements.append(Placement(detect.piece, detect.conf, kind, index, distance, color=detect.color))
     return placements
 
 
@@ -100,12 +120,33 @@ def resolve_conflicts(placements: list[Placement]) -> list[Placement]:
     return list(best.values())
 
 
-PIECE_COLORS = {
-    "settlement": (0, 200, 0),
-    "city": (255, 0, 255),
-    "road": (0, 255, 255),
-    "robber": (0, 0, 0),
+PIECES = ["settlement", "city", "road", "robber"]
+PLAYER_BGR = {
+    "red": (40, 40, 220),
+    "blue": (200, 90, 30),
+    "white": (245, 245, 245),
+    "orange": (20, 140, 255),
 }
+UNKNOWN_BGR = (128, 128, 128)
+OUTLINE_BGR = (20, 20, 20)
+
+
+def player_summary(placements: list[Placement]) -> dict[str, dict[str, int]]:
+    res = {}
+    player_pieces = {"white" : [], "blue": [], "red": [], "orange": []}
+    for place in placements:
+        if place.color is not None:
+            player_pieces[place.color].append(place)
+    
+    for color, pieces in player_pieces.items():
+        piece_type_count = {"settlement": 0, "city": 0, "road": 0}
+        if not pieces:
+            continue
+        for p in pieces:
+            piece_type_count[p.piece] += 1
+        res[color] = piece_type_count
+    return res
+    
 
 
 def draw_placements(warped: np.ndarray, board: Board, placements: list[Placement]) -> np.ndarray:
@@ -115,23 +156,25 @@ def draw_placements(warped: np.ndarray, board: Board, placements: list[Placement
         pb = tuple(int(v) for v in board.vertices[b])
         cv2.line(canvas, pa, pb, (200, 200, 200), 1)
 
-    for p in placements:
-        color = PIECE_COLORS[p.piece]
+    for p in sorted(placements, key=lambda p: p.kind != "edge"):
+        color = PLAYER_BGR.get(p.color, UNKNOWN_BGR)
         if p.kind == "edge":
             a, b = board.edges[p.target]
             pa = tuple(int(v) for v in board.vertices[a])
             pb = tuple(int(v) for v in board.vertices[b])
+            cv2.line(canvas, pa, pb, OUTLINE_BGR, 10)
             cv2.line(canvas, pa, pb, color, 6)
         elif p.kind == "vertex":
             x, y = (int(v) for v in board.vertices[p.target])
             if p.piece == "city":
-                cv2.rectangle(canvas, (x - 11, y - 11), (x + 11, y + 11), color, -1)
+                cv2.rectangle(canvas, (x - 12, y - 12), (x + 12, y + 12), color, -1)
+                cv2.rectangle(canvas, (x - 12, y - 12), (x + 12, y + 12), OUTLINE_BGR, 2)
             else:
                 cv2.circle(canvas, (x, y), 10, color, -1)
-            cv2.circle(canvas, (x, y), 10, (255, 255, 255), 1)
+                cv2.circle(canvas, (x, y), 10, OUTLINE_BGR, 2)
         else:
             x, y = (int(v) for v in board.tiles[p.target])
-            cv2.circle(canvas, (x, y), 16, color, -1)
+            cv2.circle(canvas, (x, y), 16, (0, 0, 0), -1)
             cv2.circle(canvas, (x, y), 16, (255, 255, 255), 2)
     return canvas
 
@@ -145,25 +188,34 @@ def main() -> None:
         print(f"no corners in {OUT}, run click_corners.py first")
         return
 
+    if not REFS.exists():
+        print(f"no color references at {REFS}, run color.py first")
+        return
+
     model = YOLO(str(WEIGHTS))
     board = build_board()
+    refs = load_refs()
     OUTPUT.mkdir(parents=True, exist_ok=True)
 
     for pid, clicked in corners.items():
         image_path = find_image(pid)
+        image = cv2.imread(str(image_path))
         homography = compute_homography(clicked)
         detections = detect(model, image_path)
+        color_detections(detections, image, refs)
         snapped = snap(detections, homography, board)
         placements = resolve_conflicts(snapped)
 
-        warped = warp(cv2.imread(str(image_path)), homography)
+        warped = warp(image, homography)
         cv2.imwrite(str(OUTPUT / f"{pid}.jpg"), draw_placements(warped, board, placements))
 
-        counts = {piece: sum(p.piece == piece for p in placements) for piece in PIECE_COLORS}
+        counts = {piece: sum(p.piece == piece for p in placements) for piece in PIECES}
         off_board = len(detections) - len(snapped)
         conflicts = len(snapped) - len(placements)
         summary = "  ".join(f"{piece}={n}" for piece, n in counts.items())
         print(f"{pid:12} {summary}  off_board={off_board}  conflicts={conflicts}")
+        for color, pieces in player_summary(placements).items():
+            print(f"    {color:7} {pieces['settlement']} settlements, {pieces['city']} cities, {pieces['road']} roads")
     print(f"saved to {OUTPUT}")
 
 
