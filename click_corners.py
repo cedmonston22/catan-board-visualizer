@@ -4,8 +4,8 @@ from pathlib import Path
 import cv2
 import numpy as np
 
-IMAGES = [Path("datasets/catan/train/images"), Path("datasets/catan/valid/images")]
-ONLY = {"IMG_8639", "IMG_8630", "round03_01", "round03_02", "round03_15"}
+IMAGES = [Path("datasets/catan/train/images"), Path("datasets/catan/valid/images"), Path("datasets/test_photos")]
+ONLY = {"test01"}
 OUT = Path("data/corners.json")
 WINDOW = "click corners"
 MAX_DISPLAY_HEIGHT = 650
