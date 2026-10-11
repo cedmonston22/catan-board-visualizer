@@ -5,7 +5,7 @@ import cv2
 import numpy as np
 
 IMAGES = [Path("datasets/catan/train/images"), Path("datasets/catan/valid/images"), Path("datasets/test_photos")]
-ONLY = {"test01"}
+ONLY = set()
 OUT = Path("data/corners.json")
 WINDOW = "click corners"
 MAX_DISPLAY_HEIGHT = 650
