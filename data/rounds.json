@@ -1,0 +1,19 @@
+{
+  "1": {
+    "empty": "IMG_8597",
+    "photos": ["IMG_8597", "IMG_8598", "IMG_8601", "IMG_8602", "IMG_8605", "IMG_8606", "IMG_8607", "IMG_8608",
+               "IMG_8609", "IMG_8610", "IMG_8611", "IMG_8612", "IMG_8613", "IMG_8614", "IMG_8615", "IMG_8616",
+               "IMG_8617", "IMG_8618", "IMG_8619", "IMG_8620", "IMG_8621", "IMG_8622", "IMG_8623"]
+  },
+  "2": {
+    "empty": "IMG_8639",
+    "photos": ["IMG_8624", "IMG_8625", "IMG_8626", "IMG_8627", "IMG_8628", "IMG_8629", "IMG_8630", "IMG_8631",
+               "IMG_8632", "IMG_8633", "IMG_8634", "IMG_8635", "IMG_8636", "IMG_8637", "IMG_8638", "IMG_8639"]
+  },
+  "3": {
+    "empty": "round03_01",
+    "photos": ["round03_01", "round03_02", "round03_03", "round03_04", "round03_05", "round03_06", "round03_07",
+               "round03_08", "round03_09", "round03_10", "round03_11", "round03_12", "round03_13", "round03_14",
+               "round03_15", "round03_16", "round03_17", "round03_18"]
+  }
+}
