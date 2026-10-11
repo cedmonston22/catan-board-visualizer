@@ -5,8 +5,8 @@ from pathlib import Path
 import cv2
 import numpy as np
 
-from click_corners import OUT, load_saved
-from rectify import CENTER, TILE_SIZE, compute_homography, find_image, tile_centers, warp
+from data_prep.click_corners import OUT, load_saved
+from pipeline.rectify import CENTER, TILE_SIZE, compute_homography, find_image, tile_centers, warp
 
 ROUNDS = Path("data/rounds.json")
 ROTATIONS = Path("outputs/rotations.json")

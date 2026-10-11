@@ -5,10 +5,10 @@ import cv2
 import numpy as np
 from ultralytics import YOLO
 
-from board import Board, build_board, edge_midpoint
-from click_corners import OUT, load_saved
-from extract_crops import PAD, crop_box
-from rectify import TILE_SIZE, compute_homography, find_image, warp
+from pipeline.board import Board, build_board, edge_midpoint
+from data_prep.click_corners import OUT, load_saved
+from data_prep.extract_crops import PAD, crop_box
+from pipeline.rectify import TILE_SIZE, compute_homography, find_image, warp
 
 WEIGHTS = Path("runs/detect/catan_v2/weights/best.pt")
 COLOR_WEIGHTS = Path("runs/classify/colors_v1/weights/best.pt")

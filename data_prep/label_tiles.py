@@ -5,9 +5,9 @@ from pathlib import Path
 import cv2
 import numpy as np
 
-from click_corners import OUT, load_saved
-from layout import ROUNDS, warped_photo
-from rectify import CANVAS, TILE_SIZE, tile_centers
+from data_prep.click_corners import OUT, load_saved
+from pipeline.layout import ROUNDS, warped_photo
+from pipeline.rectify import CANVAS, TILE_SIZE, tile_centers
 
 LABELS = Path("data/tiles.json")
 WINDOW = "label tiles"

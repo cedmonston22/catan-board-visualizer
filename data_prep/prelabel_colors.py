@@ -4,9 +4,9 @@ from pathlib import Path
 import cv2
 import numpy as np
 
-from color import COLORS, REFS, classify
-from extract_crops import INDEX, OUTPUT
-from label_colors import LABELS
+from data_prep.color import COLORS, REFS, classify
+from data_prep.extract_crops import INDEX, OUTPUT
+from data_prep.label_colors import LABELS
 
 ALL_LABELS = Path("data/colors_all.json")
 

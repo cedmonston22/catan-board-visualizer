@@ -5,7 +5,7 @@ from pathlib import Path
 import cv2
 import numpy as np
 
-from extract_crops import INDEX, OUTPUT
+from data_prep.extract_crops import INDEX, OUTPUT
 
 LABELS = Path("data/colors.json")
 SAMPLE_SIZE = 200

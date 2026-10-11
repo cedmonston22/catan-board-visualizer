@@ -3,8 +3,8 @@ import json
 import cv2
 import numpy as np
 
-from extract_crops import OUTPUT
-from prelabel_colors import ALL_LABELS
+from data_prep.extract_crops import OUTPUT
+from data_prep.prelabel_colors import ALL_LABELS
 
 WINDOW = "review colors"
 COLS = 8

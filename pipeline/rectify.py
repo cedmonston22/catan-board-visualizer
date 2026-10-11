@@ -4,7 +4,7 @@ from pathlib import Path
 import cv2
 import numpy as np
 
-from click_corners import IMAGES, OUT, load_saved
+from data_prep.click_corners import IMAGES, OUT, load_saved
 
 TILE_SIZE = 100
 CANVAS = 1000

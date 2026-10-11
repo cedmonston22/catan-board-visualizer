@@ -4,8 +4,8 @@ from pathlib import Path
 import cv2
 import numpy as np
 
-from apply_masks import DATASET, load_names, read_labels, to_pixels
-from click_corners import photo_id
+from data_prep.apply_masks import DATASET, load_names, read_labels, to_pixels
+from data_prep.click_corners import photo_id
 
 SPLITS = ["train", "valid"]
 SKIP = {"robber"}

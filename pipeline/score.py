@@ -1,7 +1,7 @@
 from dataclasses import dataclass
 
-from board import Board, build_board
-from snap import Placement, load_pipeline, read_photo
+from pipeline.board import Board, build_board
+from pipeline.snap import Placement, load_pipeline, read_photo
 
 PLAYERS = ["red", "blue", "white", "orange"]
 LONGEST_ROAD_MIN = 5

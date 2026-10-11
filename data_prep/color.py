@@ -4,8 +4,8 @@ from pathlib import Path
 import cv2
 import numpy as np
 
-from extract_crops import INDEX, OUTPUT
-from label_colors import LABELS
+from data_prep.extract_crops import INDEX, OUTPUT
+from data_prep.label_colors import LABELS
 
 COLORS = ["red", "blue", "white", "orange"]
 REFS = Path("data/color_refs.json")

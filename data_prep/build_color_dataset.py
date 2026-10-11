@@ -2,9 +2,9 @@ import json
 import shutil
 from pathlib import Path
 
-from color import COLORS
-from extract_crops import INDEX, OUTPUT
-from prelabel_colors import ALL_LABELS
+from data_prep.color import COLORS
+from data_prep.extract_crops import INDEX, OUTPUT
+from data_prep.prelabel_colors import ALL_LABELS
 
 DATASET = Path("datasets/colors")
 SPLIT_FOLDER = {"train": "train", "valid": "val"}

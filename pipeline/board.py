@@ -4,7 +4,7 @@ from dataclasses import dataclass
 import cv2
 import numpy as np
 
-from rectify import OUTPUT, TILE_SIZE, tile_centers
+from pipeline.rectify import OUTPUT, TILE_SIZE, tile_centers
 
 
 @dataclass
