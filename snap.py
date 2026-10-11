@@ -181,39 +181,57 @@ def draw_placements(warped: np.ndarray, board: Board, placements: list[Placement
     return canvas
 
 
-def main() -> None:
+@dataclass
+class Reading:
+    image: np.ndarray
+    homography: np.ndarray
+    detections: list[Detection]
+    snapped: list[Placement]
+    placements: list[Placement]
+
+
+def load_pipeline() -> tuple[YOLO, YOLO, dict[str, list[list[float]]]] | None:
     if not WEIGHTS.exists():
         print(f"no weights at {WEIGHTS}, train a model first")
-        return
+        return None
+    if not COLOR_WEIGHTS.exists():
+        print(f"no color classifier at {COLOR_WEIGHTS}, run train_color.py first")
+        return None
     corners = load_saved(OUT)
     if not corners:
         print(f"no corners in {OUT}, run click_corners.py first")
-        return
+        return None
+    return YOLO(str(WEIGHTS)), YOLO(str(COLOR_WEIGHTS)), corners
 
-    if not COLOR_WEIGHTS.exists():
-        print(f"no color classifier at {COLOR_WEIGHTS}, run train_color.py first")
-        return
 
-    model = YOLO(str(WEIGHTS))
-    color_model = YOLO(str(COLOR_WEIGHTS))
+def read_photo(pid: str, clicked: list[list[float]], model: YOLO, color_model: YOLO, board: Board) -> Reading:
+    image_path = find_image(pid)
+    image = cv2.imread(str(image_path))
+    homography = compute_homography(clicked)
+    detections = detect(model, image_path)
+    color_detections(detections, image, color_model)
+    snapped = snap(detections, homography, board)
+    return Reading(image, homography, detections, snapped, resolve_conflicts(snapped))
+
+
+def main() -> None:
+    loaded = load_pipeline()
+    if loaded is None:
+        return
+    model, color_model, corners = loaded
     board = build_board()
     OUTPUT.mkdir(parents=True, exist_ok=True)
 
     for pid, clicked in corners.items():
-        image_path = find_image(pid)
-        image = cv2.imread(str(image_path))
-        homography = compute_homography(clicked)
-        detections = detect(model, image_path)
-        color_detections(detections, image, color_model)
-        snapped = snap(detections, homography, board)
-        placements = resolve_conflicts(snapped)
+        reading = read_photo(pid, clicked, model, color_model, board)
+        placements = reading.placements
 
-        warped = warp(image, homography)
+        warped = warp(reading.image, reading.homography)
         cv2.imwrite(str(OUTPUT / f"{pid}.jpg"), draw_placements(warped, board, placements))
 
         counts = {piece: sum(p.piece == piece for p in placements) for piece in PIECES}
-        off_board = len(detections) - len(snapped)
-        conflicts = len(snapped) - len(placements)
+        off_board = len(reading.detections) - len(reading.snapped)
+        conflicts = len(reading.snapped) - len(placements)
         summary = "  ".join(f"{piece}={n}" for piece, n in counts.items())
         print(f"{pid:12} {summary}  off_board={off_board}  conflicts={conflicts}")
         for color, pieces in player_summary(placements).items():
