@@ -10,6 +10,7 @@ from data_prep.apply_masks import load_names, read_labels
 from data_prep.click_corners import OUT, load_saved
 from pipeline.layout import ROTATIONS, ROUNDS, rotation_perm, warped_photo
 from pipeline.rectify import TILE_SIZE, compute_homography, find_image, tile_centers
+from pipeline.tokens import find_token, isolate_token
 
 TILE_LABELS = Path("data/tiles.json")
 TILES_OUT = Path("datasets/tiles")
@@ -56,6 +57,7 @@ def main() -> None:
 
     counts = {"tiles": {}, "tokens": {}}
     skipped_tokens = 0
+    missed_tokens = 0
     for round_name, info in rounds.items():
         split = "val" if round_name in VAL_ROUNDS else "train"
         for pid in info["photos"]:
@@ -76,14 +78,18 @@ def main() -> None:
                 if j == robber and number != "none":
                     skipped_tokens += 1
                     continue
+                token_crop = crop_square(warped, center, TOKEN_HALF)
+                if number != "none" and find_token(token_crop) is None:
+                    missed_tokens += 1
+                    continue
                 folder = TOKENS_OUT / split / number
                 folder.mkdir(parents=True, exist_ok=True)
-                cv2.imwrite(str(folder / name), crop_square(warped, center, TOKEN_HALF))
+                cv2.imwrite(str(folder / name), isolate_token(token_crop))
                 counts["tokens"][number] = counts["tokens"].get(number, 0) + 1
 
     for kind, by_class in counts.items():
         print(f"{kind:6} {sum(by_class.values()):5}  {dict(sorted(by_class.items()))}")
-    print(f"skipped {skipped_tokens} token crops hidden under the robber")
+    print(f"skipped {skipped_tokens} token crops hidden under the robber, {missed_tokens} where no token was found")
 
 
 if __name__ == "__main__":
