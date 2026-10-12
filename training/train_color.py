@@ -11,7 +11,7 @@ def main():
         imgsz=128,
         batch=64,
         workers=0,
-        name="colors_v2"
+        name="colors_v3"
     )
     
     
