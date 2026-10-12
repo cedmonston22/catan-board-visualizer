@@ -1,0 +1,5 @@
+torch==2.13.0
+torchvision==0.28.0
+ultralytics==8.4.175
+numpy==2.5.3
+spaces==0.51.3

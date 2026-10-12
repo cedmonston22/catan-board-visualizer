@@ -20,6 +20,7 @@ from pipeline.snap import PLAYER_BGR
 logger = logging.getLogger("catan_app")
 logging.basicConfig(level=logging.INFO)
 
+GUIDE = "assets/corner_guide.jpg"
 DISPLAY_MAX = 1280
 NUM_CORNERS = 6
 SLIDE_SECONDS = 0.9
@@ -28,6 +29,7 @@ CSS = f"""
 #title h1 {{ font-size: 1.4rem; margin: 0; }}
 #taps img {{ max-height: 62vh; width: 100%; object-fit: contain; }}
 #actions {{ flex-wrap: nowrap; gap: 8px; }}
+#guide img {{ width: 100%; object-fit: contain; }}
 #stage .html-container {{ padding: 0 !important; }}
 #stage .stage {{ position: relative; overflow: hidden; border-radius: 8px; background: #111; }}
 #stage .stage .photo {{ display: block; width: 100%; max-height: 62vh; object-fit: contain; }}
@@ -122,7 +124,8 @@ def result_info(result: BoardResult, seconds: float) -> str:
 
 def tap_info(session: Session, message: str = "") -> str:
     count = len(session.taps)
-    prompt = (f"Tap the {NUM_CORNERS} corners of the land tiles, just inside the blue frame ({count}/{NUM_CORNERS})"
+    prompt = (f"Tap the {NUM_CORNERS} points where the sandy beach meets the sea, like the yellow dots below "
+              f"({count}/{NUM_CORNERS})"
               if count < NUM_CORNERS
               else "All 6 corners placed. Read the board, or undo to move one.")
     extra = f'<div class="notes">{message}</div>' if message else ""
@@ -148,7 +151,7 @@ def tap_image(session: Session) -> np.ndarray:
 def upload_view() -> tuple:
     return (gr.update(value=None, visible=True), gr.update(value=None, visible=False), gr.update(value="", visible=False),
             "", None, gr.update(visible=False), gr.update(visible=False), gr.update(visible=False),
-            gr.update(visible=False))
+            gr.update(visible=False), gr.update(visible=False))
 
 
 def tap_view(session: Session, message: str = "") -> tuple:
@@ -156,13 +159,14 @@ def tap_view(session: Session, message: str = "") -> tuple:
             gr.update(value="", visible=False), tap_info(session, message), session,
             gr.update(visible=True, interactive=bool(session.taps)),
             gr.update(visible=True, interactive=len(session.taps) == NUM_CORNERS), gr.update(visible=False),
-            gr.update(visible=True))
+            gr.update(visible=True), gr.update(visible=True))
 
 
 def result_view(session: Session, result: BoardResult, seconds: float) -> tuple:
     return (gr.update(visible=False), gr.update(value=None, visible=False),
             gr.update(value=stage_html(session, result), visible=True), result_info(result, seconds), session,
-            gr.update(visible=False), gr.update(visible=False), gr.update(visible=True), gr.update(visible=True))
+            gr.update(visible=False), gr.update(visible=False), gr.update(visible=True), gr.update(visible=True),
+            gr.update(visible=False))
 
 
 def on_upload_photo(image_rgb: np.ndarray | None) -> tuple:
@@ -199,7 +203,7 @@ def on_click_read_corners(session: Session | None) -> tuple:
         return tap_view(session, f"Place all {NUM_CORNERS} corners first.")
     ordered = clockwise_from_top(np.array(session.taps, dtype=np.float32) / session.scale)
     if not is_convex_hexagon(ordered):
-        return tap_view(session, "Those taps don't make a hexagon. Undo and tap the corners of the land tiles.")
+        return tap_view(session, "Those taps don't make a hexagon. Undo and tap the beach points shown in the example.")
     result, seconds = run(session, ordered.tolist())
     if result.problem:
         return tap_view(session, f"Couldn't read the board with these corners ({result.problem}).")
@@ -227,8 +231,9 @@ def build_ui() -> gr.Blocks:
             corners_button = gr.Button("Read board", variant="primary", size="sm", visible=False, min_width=0)
             fix_button = gr.Button("Fix corners", size="sm", visible=False, min_width=0)
             new_button = gr.Button("New photo", size="sm", visible=False, min_width=0)
+        guide = gr.Image(GUIDE, interactive=False, show_label=False, buttons=[], visible=False, elem_id="guide")
 
-        outputs = [photo, taps, stage, info, state, undo_button, corners_button, fix_button, new_button]
+        outputs = [photo, taps, stage, info, state, undo_button, corners_button, fix_button, new_button, guide]
         photo.upload(on_upload_photo, inputs=photo, outputs=outputs, api_name="read")
         photo.clear(upload_view, outputs=outputs, api_name=False)
         taps.select(on_select_tap, inputs=state, outputs=outputs, api_name=False)
