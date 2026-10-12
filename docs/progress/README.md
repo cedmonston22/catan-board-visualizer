@@ -216,3 +216,54 @@ This is the corner detector's limit (39 photos from one table), and the main rea
 - Built around one function, `read_board(image, models, board, corners=None)`, that works on an image in memory and returns a `BoardResult`: corners (automatic or manual), pieces, hexes, scores, the rendered board, and plain-language warnings.
 - If the automatic corners fail the checks, it returns a problem instead of a wrong board. The command line then opens the click window for that photo; the future phone page will show draggable corners instead.
 - The future web app calls the same function, so the phone and the command line give identical answers.
+
+## New rounds: a new setting
+
+Rounds 1-3 were all on one table, mostly in the evening. Rounds 4 and 5 (40 photos) were shot on carpet in a different room: Round 4 in cool, even light, Round 5 under a warm lamp, with very steep and very distant shots on purpose. Both went into training; Round 3 stayed the validation set so every before/after number below is on the same photos. `new_rounds_round05.jpg`.
+
+### How the old models did in the new setting (before retraining)
+
+| model | old setting (Round 3) | new setting (Rounds 4-5) |
+|---|---|---|
+| automatic corners | 17/18 accepted | **20/40** accepted. `new_rounds_v1_corner_results.jpg` |
+| piece detector (catan_v2) | mAP50-95 0.85 | **0.71**: 41 city/settlement swaps, 36 roads missed, 128 false pieces |
+| tile classifier (tiles_v1) | tile check passes 18/18 | **28/40**: warm, washed-out tiles read as desert |
+| token reader (tokens_v2) | 99.7% of numbers | **88%** |
+| color (colors_v2) | 0 mistakes | **12** mistakes, 10 of them white read as orange under the warm lamp |
+
+Every model lost accuracy in a room it hadn't seen. This is the strongest evidence in the project that the original numbers were measured on the same conditions the models trained on.
+
+### Labeling the new rounds
+
+The existing models did most of the labeling:
+
+- **Corners:** 20 of 40 found automatically, 20 clicked by hand.
+- **Rounds and rotations:** both rounds matched their empty boards (Round 5's empty board was shot at the end of the game).
+- **Tiles:** 2 boards x 19 hexes labeled by hand, about 4 minutes.
+- **Pieces:** auto-labeled and reviewed in Roboflow.
+- **Colors:** colors_v2 pre-labeled the 1,081 new crops; review corrected only 17 (the old k-means pre-labels needed 173 corrections on a similar amount). Reviewed labels now store their photo, piece type, and box, so they carry over to future exports by box overlap instead of by file name.
+
+### After retraining
+
+| model | Round 3 (held out) | new setting | notes |
+|---|---|---|---|
+| corners_v2 | 17/18, one corner over 30 px (was 4) | 39/40 automatic with tiles_v2 | test01's worst corner 92 px to 24 px |
+| tiles_v2 | 100% | tile check 40/40 | the 12 rejections were the tile classifier, not the corners: with hand-clicked corners, tiles_v1 still failed them |
+| catan_v3 | mAP50-95 0.865 (was 0.851), false pieces 21 to 12 | trained on these | |
+| colors_v4 | 0 mistakes | 2 mistakes in about 3,200 crops overall | v2 had 17 |
+| tokens_v3 | 98.8% (v2: 99.7%) | 95% (v2: 88%) | mixed; v2 kept until unseen test photos decide |
+
+New-setting numbers for retrained models are on their own training photos, so they show what was learned, not generalization. The unseen test photos are the real test.
+
+### More bad labels, all from warm light
+
+The road rule (a building should touch a road of its own color) and a second rule (no player owns more than 5 settlements, 4 cities, or 15 roads) flagged 12 problems with colors_v2, mostly in Round 5. Retraining fixed most of them, but the new model then "disagreed" with 7 labels in IMG_8633, the warm-lamp half of Round 2. They were white pieces labeled orange: k-means pre-labels from the first round of labeling that had passed review. `warm_light_label_fix_IMG_8633.jpg`.
+
+- That makes three times a model disagreement or a game rule exposed wrong labels, all automatic pre-labels, all in warm light. Warm-light photos need extra care in review.
+- A first colors_v4 run learned nothing new: the labels were fixed but the dataset wasn't rebuilt, and the classifier reads labels from which folder a crop is in. Labels, then rebuild, then train.
+- With corrected labels, colors_v4 has 0 mistakes on Rounds 1-3 and the road rule flags only one steep, distant photo, where a red road was probably not detected.
+
+### Process lessons
+
+- Never rebuild a dataset while a model is training on it: the builders wipe their folder, and the tile training crashed at epoch 9 when its images disappeared.
+- Improving one model exposes the next weakest: better corners revealed that the tile classifier was the real reason boards were rejected.
