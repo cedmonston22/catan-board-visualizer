@@ -111,3 +111,58 @@ The fix (`pipeline/tokens.py`):
 `tokens_before_after_isolation.jpg`, `tokens_v1_training_curves.png`, `tokens_v2_training_curves.png`.
 
 Known weakness: the circle finder occasionally locks onto a round shape in the terrain instead of the token (one such crop is visible in the 12 row of the before/after image). The model still scored 100%, but more layouts would make this rarer to matter.
+
+## Regenerated board
+
+Goal 2 of the original plan: one photo in, a clean digital board out (resources, numbers, robber, every player's pieces in their colors, and the score panel). `pipeline/hexes.py` reads the 19 hexes, `pipeline/render.py` draws the board from the board state alone, with no photo pixels.
+
+`render_test01_photo_to_board.jpg`: the unseen-room photo and its regenerated board.
+
+### Reading numbers in real photos
+
+Three problems showed up once the token reader ran on whole photos instead of training crops, each fixed with a rule rather than more training:
+
+| problem | fix | effect |
+|---|---|---|
+| when no token was found, the model guessed on a terrain-only crop (most often reading a 5 as a 2) | no token found means the number is unknown, not guessed | 11 wrong numbers became honest unknowns |
+| some tokens sit near the edge of their hex, outside the 40 px search area | search the whole hex (up to 70 px off-center), keeping the 23-32 px radius limit | tokens not found: 41 to 0, and the 38 recovered were read correctly |
+| the robber covers a token, and the model still guessed a number | the snapped robber's hex is marked unknown | test01's covered token stopped reading as a third 9 |
+
+Then deduction (`fill_unknown_numbers`): every board has exactly one 2, one 12, and two of every other number. Whatever is missing from the numbers that were read must be the hidden one. It only fills in when exactly one hex is unknown and exactly one number is left over, and it backs off if any number was read too many times. On test01, the board showed one 4 where there should be two, so the robber's token is the 4.
+
+Results across the 57 labeled photos:
+
+| | count |
+|---|---|
+| resources right | 1,083 / 1,083 |
+| numbers read right by the model | 978 |
+| numbers filled right by deduction | **43 / 43** (no wrong fills) |
+| still unknown | 3 (photos with two unknowns, where filling would be a guess) |
+| wrong | 2 |
+| **numbers right overall** | **1,021 / 1,026 (99.5%)** |
+
+test01 (a layout the classifiers never saw): 19 / 19 resources, all 17 visible numbers right, and the hidden one deduced correctly.
+
+## Label errors found with a game rule
+
+A user-reported bug: in IMG_8616 a settlement rendered blue, but the piece in the photo is orange.
+
+The color model was not misreading it. Its crop was labeled blue in `data/colors_all.json`: an automatic pre-label, fooled by the sea filling half the crop, that slipped through review. IMG_8616 is a training photo, so the classifier learned the mistake and was 99.8% confident the orange piece was blue. The usual audit (model vs labels) could not see it, because the model and the label agreed.
+
+What found it was a rule from the game that does not depend on any labels: a settlement or city should touch at least one road of its own color. Checking every building on every photo flagged three:
+
+| photo | piece | problem |
+|---|---|---|
+| IMG_8616 | settlement | orange, labeled blue: label wrong, model learned it |
+| IMG_8633 | settlement | white under the warm Round 2 lamp, labeled orange: label wrong |
+| IMG_8628 | road | red with glare, model said orange: model wrong, label right |
+
+`label_fix_suspect_pieces.jpg` shows each flagged piece with its prediction and label.
+
+Fix: corrected the two labels and retrained (`colors_v2`, 100% on Round 3). After that, the rule check finds nothing on any of the 58 photos, the label audit finds no mismatches, and the IMG_8628 road was fixed too, even though its own label was always right. `label_fix_IMG_8616_before_after.jpg`.
+
+Takeaways:
+
+- A high accuracy score only measures agreement with the labels. A model trained on a wrong label will confidently reproduce it, and an audit against those same labels will pass.
+- Both bad labels were automatic pre-labels. Review catches most of these, but not all, especially when the background resembles another player's color (sea vs blue, warm light vs orange).
+- Checks that come from the domain, like the road rule here or the token counts in deduction, catch errors that the data alone can't. The road rule is a good candidate for a permanent check that flags suspicious pieces in the pipeline.
