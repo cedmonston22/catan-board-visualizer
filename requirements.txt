@@ -5,3 +5,5 @@ ultralytics==8.4.175
 opencv-python==5.0.0.93
 numpy==2.5.3
 PyYAML==6.0.3
+gradio==6.30.0
+spaces==0.51.3
