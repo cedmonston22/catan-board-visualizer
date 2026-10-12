@@ -8,7 +8,7 @@ from ultralytics import YOLO
 from pipeline.rectify import TILE_SIZE, tile_centers
 from pipeline.tokens import find_token, isolate_token
 
-TILE_WEIGHTS = Path("runs/classify/tiles_v1/weights/best.pt")
+TILE_WEIGHTS = Path("runs/classify/tiles_v2/weights/best.pt")
 TOKEN_WEIGHTS = Path("runs/classify/tokens_v2/weights/best.pt")
 TILE_IMGSZ = 224
 TOKEN_IMGSZ = 96

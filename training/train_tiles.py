@@ -11,7 +11,7 @@ def main():
         imgsz=224,
         batch=64,
         workers=0,
-        name="tiles_v1"
+        name="tiles_v2"
     )
     
     
