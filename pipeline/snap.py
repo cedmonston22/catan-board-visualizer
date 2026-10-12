@@ -38,8 +38,8 @@ class Placement:
     color: str | None = None
 
 
-def detect(model: YOLO, image_path: Path) -> list[Detection]:
-    result = model.predict(str(image_path), imgsz=IMGSZ, conf=CONF, verbose=False)[0]
+def detect(model: YOLO, image: np.ndarray) -> list[Detection]:
+    result = model.predict(image, imgsz=IMGSZ, conf=CONF, verbose=False)[0]
     boxes = result.boxes.xyxy.tolist()
     classes = result.boxes.cls.tolist()
     confs = result.boxes.conf.tolist()
@@ -204,14 +204,16 @@ def load_pipeline() -> tuple[YOLO, YOLO, dict[str, list[list[float]]]] | None:
     return YOLO(str(WEIGHTS)), YOLO(str(COLOR_WEIGHTS)), corners
 
 
-def read_photo(pid: str, clicked: list[list[float]], model: YOLO, color_model: YOLO, board: Board) -> Reading:
-    image_path = find_image(pid)
-    image = cv2.imread(str(image_path))
-    homography = compute_homography(clicked)
-    detections = detect(model, image_path)
+def read_image(image: np.ndarray, corners: list[list[float]], model: YOLO, color_model: YOLO, board: Board) -> Reading:
+    homography = compute_homography(corners)
+    detections = detect(model, image)
     color_detections(detections, image, color_model)
     snapped = snap(detections, homography, board)
     return Reading(image, homography, detections, snapped, resolve_conflicts(snapped))
+
+
+def read_photo(pid: str, clicked: list[list[float]], model: YOLO, color_model: YOLO, board: Board) -> Reading:
+    return read_image(cv2.imread(str(find_image(pid))), clicked, model, color_model, board)
 
 
 def main() -> None:
