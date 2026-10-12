@@ -232,5 +232,161 @@
    "resource": "wood",
    "number": 5
   }
+ ],
+ "4": [
+  {
+   "resource": "sheep",
+   "number": 5
+  },
+  {
+   "resource": "brick",
+   "number": 9
+  },
+  {
+   "resource": "brick",
+   "number": 6
+  },
+  {
+   "resource": "wheat",
+   "number": 8
+  },
+  {
+   "resource": "desert",
+   "number": null
+  },
+  {
+   "resource": "wheat",
+   "number": 10
+  },
+  {
+   "resource": "wood",
+   "number": 11
+  },
+  {
+   "resource": "wood",
+   "number": 5
+  },
+  {
+   "resource": "sheep",
+   "number": 4
+  },
+  {
+   "resource": "ore",
+   "number": 9
+  },
+  {
+   "resource": "wood",
+   "number": 2
+  },
+  {
+   "resource": "sheep",
+   "number": 3
+  },
+  {
+   "resource": "ore",
+   "number": 11
+  },
+  {
+   "resource": "wood",
+   "number": 8
+  },
+  {
+   "resource": "ore",
+   "number": 4
+  },
+  {
+   "resource": "sheep",
+   "number": 3
+  },
+  {
+   "resource": "wheat",
+   "number": 10
+  },
+  {
+   "resource": "brick",
+   "number": 12
+  },
+  {
+   "resource": "wheat",
+   "number": 6
+  }
+ ],
+ "5": [
+  {
+   "resource": "wood",
+   "number": 12
+  },
+  {
+   "resource": "wood",
+   "number": 9
+  },
+  {
+   "resource": "ore",
+   "number": 10
+  },
+  {
+   "resource": "sheep",
+   "number": 8
+  },
+  {
+   "resource": "ore",
+   "number": 2
+  },
+  {
+   "resource": "brick",
+   "number": 5
+  },
+  {
+   "resource": "wood",
+   "number": 6
+  },
+  {
+   "resource": "sheep",
+   "number": 4
+  },
+  {
+   "resource": "wood",
+   "number": 9
+  },
+  {
+   "resource": "wheat",
+   "number": 10
+  },
+  {
+   "resource": "wheat",
+   "number": 3
+  },
+  {
+   "resource": "sheep",
+   "number": 11
+  },
+  {
+   "resource": "wheat",
+   "number": 6
+  },
+  {
+   "resource": "sheep",
+   "number": 4
+  },
+  {
+   "resource": "desert",
+   "number": null
+  },
+  {
+   "resource": "brick",
+   "number": 11
+  },
+  {
+   "resource": "ore",
+   "number": 3
+  },
+  {
+   "resource": "brick",
+   "number": 8
+  },
+  {
+   "resource": "wheat",
+   "number": 5
+  }
  ]
 }
