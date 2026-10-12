@@ -12,7 +12,7 @@ def main():
         imgsz=96,
         batch=64,
         workers=0,
-        name="tokens_v2"
+        name="tokens_v3"
     )
     
     
