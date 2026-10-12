@@ -9,9 +9,10 @@ from pipeline.board import Board, build_board, edge_midpoint
 from data_prep.click_corners import OUT, load_saved
 from data_prep.extract_crops import PAD, crop_box
 from pipeline.rectify import TILE_SIZE, compute_homography, find_image, warp
+from pipeline.weights import weights_path
 
-WEIGHTS = Path("runs/detect/catan_v3/weights/best.pt")
-COLOR_WEIGHTS = Path("runs/classify/colors_v4/weights/best.pt")
+WEIGHTS = weights_path("pieces")
+COLOR_WEIGHTS = weights_path("colors")
 COLOR_IMGSZ = 128
 IMGSZ = 1024
 CONF = 0.25
@@ -192,10 +193,10 @@ class Reading:
 
 def load_pipeline() -> tuple[YOLO, YOLO, dict[str, list[list[float]]]] | None:
     if not WEIGHTS.exists():
-        print(f"no weights at {WEIGHTS}, train a model first")
+        print(f"no weights at {WEIGHTS}, promote one with python -m pipeline.promote pieces path/to/best.pt")
         return None
     if not COLOR_WEIGHTS.exists():
-        print(f"no color classifier at {COLOR_WEIGHTS}, run train_color.py first")
+        print(f"no color classifier at {COLOR_WEIGHTS}, promote one with python -m pipeline.promote colors path/to/best.pt")
         return None
     corners = load_saved(OUT)
     if not corners:

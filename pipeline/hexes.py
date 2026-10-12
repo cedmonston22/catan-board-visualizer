@@ -1,5 +1,4 @@
 from dataclasses import dataclass
-from pathlib import Path
 from collections import Counter
 
 import numpy as np
@@ -7,9 +6,10 @@ from ultralytics import YOLO
 
 from pipeline.rectify import TILE_SIZE, tile_centers
 from pipeline.tokens import find_token, isolate_token
+from pipeline.weights import weights_path
 
-TILE_WEIGHTS = Path("runs/classify/tiles_v2/weights/best.pt")
-TOKEN_WEIGHTS = Path("runs/classify/tokens_v2/weights/best.pt")
+TILE_WEIGHTS = weights_path("tiles")
+TOKEN_WEIGHTS = weights_path("tokens")
 TILE_IMGSZ = 224
 TOKEN_IMGSZ = 96
 HEX_HALF = int(TILE_SIZE * 0.9)
@@ -33,7 +33,7 @@ def crop_square(image: np.ndarray, center: tuple[float, float], half: int) -> np
 def load_hex_models() -> tuple[YOLO, YOLO] | None:
     for weights in (TILE_WEIGHTS, TOKEN_WEIGHTS):
         if not weights.exists():
-            print(f"no classifier at {weights}, run its training script first")
+            print(f"no classifier at {weights}, promote one with python -m pipeline.promote {weights.stem} path/to/best.pt")
             return None
     return YOLO(str(TILE_WEIGHTS)), YOLO(str(TOKEN_WEIGHTS))
 

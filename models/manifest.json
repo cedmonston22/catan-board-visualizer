@@ -1,0 +1,42 @@
+{
+  "pieces": {
+    "source": "runs/detect/catan_v3/weights/best.pt",
+    "trained": "2026-10-12T00:08:07.517988-07:00",
+    "promoted": "2026-10-12",
+    "task": "detect",
+    "imgsz": 1024,
+    "sha256": "fd71fce6d1a684ee59ad9e0cd82ecd87e260c155c16daa1bdcb95d78b11e6314"
+  },
+  "colors": {
+    "source": "runs/classify/colors_v4/weights/best.pt",
+    "trained": "2026-10-12T13:21:35.974027-07:00",
+    "promoted": "2026-10-12",
+    "task": "classify",
+    "imgsz": 128,
+    "sha256": "68e4476dee2b81821a0d4fe660705d3422963661edfcbef43f0a60af98578c6b"
+  },
+  "corners": {
+    "source": "runs/detect/corners_v2/weights/best.pt",
+    "trained": "2026-10-11T23:00:46.136907-07:00",
+    "promoted": "2026-10-12",
+    "task": "detect",
+    "imgsz": 1024,
+    "sha256": "a020e2e8a09a54d563023bb56b0349bc38a4bd6e7cae72369847e28f172bca71"
+  },
+  "tiles": {
+    "source": "runs/classify/tiles_v2/weights/best.pt",
+    "trained": "2026-10-11T23:46:31.592045-07:00",
+    "promoted": "2026-10-12",
+    "task": "classify",
+    "imgsz": 224,
+    "sha256": "0c3eaa48b27194c09d6a56b4043a533df0bac1760b56d4d7253dc1d6c72ca5bd"
+  },
+  "tokens": {
+    "source": "runs/classify/tokens_v2/weights/best.pt",
+    "trained": "2026-10-11T17:12:53.587989-07:00",
+    "promoted": "2026-10-12",
+    "task": "classify",
+    "imgsz": 96,
+    "sha256": "7d46db33675b45062ae801ed62bdca4364a17966084c45638cf82aa9c27bf14d"
+  }
+}

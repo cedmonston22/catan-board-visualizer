@@ -57,7 +57,7 @@ The full story, with every experiment, failure, and number, is in [docs/progress
 
 Requires Python 3.14; an NVIDIA GPU is recommended. Install the pinned versions with `pip install -r requirements.txt` (it pulls the CUDA 13.0 build of PyTorch from the PyTorch package index).
 
-The trained weights are not in the repository (`runs/` is git-ignored), so the models have to be trained first; see the training section below.
+The trained weights are not in the repository (`*.pt` is git-ignored). The pipeline reads the five live models from `models/` (`pieces.pt`, `colors.pt`, `corners.pt`, `tiles.pt`, `tokens.pt`); `models/manifest.json` records which training run each one came from. Train a model, then make it live with `python -m pipeline.promote <name> runs/.../weights/best.pt`, which checks the task, image size, and classes before copying it in.
 
 Read one photo, from the repo root:
 

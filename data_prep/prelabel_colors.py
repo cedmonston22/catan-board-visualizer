@@ -5,6 +5,7 @@ from ultralytics import YOLO
 
 from data_prep.extract_crops import INDEX, OUTPUT
 from pipeline.snap import COLOR_IMGSZ, COLOR_WEIGHTS
+from pipeline.weights import promoted_from
 
 ALL_LABELS = Path("data/colors_all.json")
 MIN_OVERLAP = 0.7
@@ -67,7 +68,7 @@ def main() -> None:
 
     carried = len(rows) - len(unmatched)
     dropped = len(old) - carried
-    print(f"{carried} labels carried over, {len(unmatched)} new crops pre-labeled with {COLOR_WEIGHTS.parent.parent.name}, "
+    print(f"{carried} labels carried over, {len(unmatched)} new crops pre-labeled with {promoted_from('colors')}, "
           f"{dropped} old labels had no matching crop")
     print(f"saved to {ALL_LABELS}")
 

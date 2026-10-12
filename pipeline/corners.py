@@ -2,7 +2,6 @@ import itertools
 import math
 from collections import Counter
 from dataclasses import dataclass
-from pathlib import Path
 
 import cv2
 import numpy as np
@@ -10,8 +9,9 @@ from ultralytics import YOLO
 
 from pipeline.hexes import HEX_HALF, TILE_IMGSZ, crop_square
 from pipeline.rectify import compute_homography, ideal_corners, tile_centers, warp
+from pipeline.weights import weights_path
 
-CORNER_WEIGHTS = Path("runs/detect/corners_v2/weights/best.pt")
+CORNER_WEIGHTS = weights_path("corners")
 CORNER_IMGSZ = 1024
 CORNER_CONF = 0.03
 MAX_CANDIDATES = 10
@@ -30,7 +30,7 @@ class CornerResult:
 
 def load_corner_model() -> YOLO | None:
     if not CORNER_WEIGHTS.exists():
-        print(f"no corner model at {CORNER_WEIGHTS}, run train_corners.py first")
+        print(f"no corner model at {CORNER_WEIGHTS}, promote one with python -m pipeline.promote corners path/to/best.pt")
         return None
     return YOLO(str(CORNER_WEIGHTS))
 

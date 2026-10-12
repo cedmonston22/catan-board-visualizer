@@ -42,7 +42,7 @@ class BoardResult:
 def load_models() -> Models | None:
     for weights in (WEIGHTS, COLOR_WEIGHTS):
         if not weights.exists():
-            print(f"no model at {weights}, train it first")
+            print(f"no model at {weights}, promote one with python -m pipeline.promote {weights.stem} path/to/best.pt")
             return None
     corner_model = load_corner_model()
     hex_models = load_hex_models()
