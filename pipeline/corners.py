@@ -11,7 +11,7 @@ from ultralytics import YOLO
 from pipeline.hexes import HEX_HALF, TILE_IMGSZ, crop_square
 from pipeline.rectify import compute_homography, ideal_corners, tile_centers, warp
 
-CORNER_WEIGHTS = Path("runs/detect/corners_v1/weights/best.pt")
+CORNER_WEIGHTS = Path("runs/detect/corners_v2/weights/best.pt")
 CORNER_IMGSZ = 1024
 CORNER_CONF = 0.03
 MAX_CANDIDATES = 10

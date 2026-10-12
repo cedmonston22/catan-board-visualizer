@@ -11,7 +11,7 @@ def main():
         imgsz=1024,
         batch=4,
         workers=0,
-        name="corners_v1"
+        name="corners_v2"
     )
     
     
