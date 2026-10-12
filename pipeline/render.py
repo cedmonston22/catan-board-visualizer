@@ -5,7 +5,7 @@ import cv2
 import numpy as np
 
 from pipeline.board import Board, build_board, hex_corners
-from pipeline.hexes import Hex, load_hex_models, read_hexes
+from pipeline.hexes import Hex, load_hex_models, read_hexes, fill_unknown_numbers
 from pipeline.rectify import CANVAS, CENTER, TILE_SIZE, warp
 from pipeline.score import PlayerScore, score
 from pipeline.snap import PLAYER_BGR, Placement, load_pipeline, read_photo
@@ -136,6 +136,10 @@ def main() -> None:
         for p in reading.placements:
             if p.kind == "tile":
                 hexes[p.target].number = None
+        for p in reading.placements:
+            if p.kind == "tile":
+                hexes[p.target].number = None
+        fill_unknown_numbers(hexes)        
         scores = score(board, reading.placements)
         image = render_board(board, hexes, reading.placements, scores, pid)
         cv2.imwrite(str(OUTPUT / f"{pid}.jpg"), image)

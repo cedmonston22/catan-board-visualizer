@@ -1,5 +1,6 @@
 from dataclasses import dataclass
 from pathlib import Path
+from collections import Counter
 
 import numpy as np
 from ultralytics import YOLO
@@ -14,7 +15,7 @@ TOKEN_IMGSZ = 96
 HEX_HALF = int(TILE_SIZE * 0.9)
 TOKEN_HALF = int(TILE_SIZE * 0.6)
 TOKEN_SEARCH_OFFSET = 70
-
+EXPECTED_COUNTS = {2: 1, 3: 2, 4: 2, 5: 2, 6: 2, 8: 2, 9: 2, 10: 2, 11: 2, 12: 1}
 
 @dataclass
 class Hex:
@@ -52,3 +53,18 @@ def read_hexes(warped: np.ndarray, tile_model: YOLO, token_model: YOLO) -> list[
         number = None if resource == "desert" or label == "none" or not found else int(label)
         hexes.append(Hex(resource, number, float(tile.probs.top1conf), float(token.probs.top1conf)))
     return hexes
+
+def fill_unknown_numbers(hexes: list[Hex]) -> None:
+    hex_nums = [h.number for h in hexes if h.number is not None]
+    known_nums = Counter(hex_nums)
+    not_assigned = []
+    for num, count in EXPECTED_COUNTS.items():
+        temp = count - known_nums[num]
+        if temp > 0:
+            not_assigned.extend([num] * temp)
+        elif temp < 0:
+            return
+    unknown_tiles = [h for h in hexes if h.number is None and h.resource != "desert"]
+    if len(not_assigned) == 1 and len(unknown_tiles) == 1:
+        unknown_tiles[0].number = not_assigned[0]
+        
