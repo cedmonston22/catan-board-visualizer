@@ -67,3 +67,47 @@ Checks that passed: a line (3), a line cut by an opponent's settlement (2), the 
 - `score_test01.jpg`, `score_round03_15.jpg`: original photo, the board read back with player colors, and the score panel.
 
 Known limits: the detector's city vs settlement confusion changes a score by 1 per mistake, and tile/token classification is not built yet, so the regenerated board has no resources or numbers.
+
+## Tiles and number tokens
+
+Two classifiers, not one: numbers are placed randomly on tiles, so a combined "resource + number" class (about 55 combinations) would have no examples for most pairs. One model reads the terrain from the whole hex, the other reads the digit from the token.
+
+### Labels from 3 boards, applied to 57 photos
+
+- Labeled once per round on the empty-board shot (3 boards x 19 hexes = 57 labels), checked against the fixed Catan counts and hex by hex against the photos. `tile_labels_round1.jpg`.
+- Rounds were found automatically by comparing each photo's 19 hex colors against the empty boards. Raw colors failed for Round 2 because the lighting changed halfway through it; normalizing each board by its own mean and spread fixed that.
+- Every photo is rotated by some multiple of 60 degrees relative to its empty board (it depends on where the photo was taken from). The rotation is found by trying all 6 and keeping the one whose hex colors match best (median over hexes, so pieces on a few tiles don't matter). All 57 matched; worst distance 0.72 vs 1.3+ between different rounds. `rotation_alignment_check.jpg`.
+- Result: 1,083 hex crops and 996 token crops. Round 3 held out for validation.
+
+### Tiles: 100% on Round 3 (first try)
+
+- YOLO11n-cls, 224 px. 100% on Round 3 by epoch 6. `tile_crops_by_resource.jpg`, `tiles_v1_training_curves.png`.
+
+### Tokens: shortcut learning, then 100%
+
+| version | input | Round 3 accuracy | what went wrong |
+|---|---|---|---|
+| v1 | 120 px square around the hex center, terrain visible | about 80%, the 12 got 0 of 15 | learned the terrain under the token instead of the digit |
+| v2 | token found by circle detection, everything outside it painted gray, no mirror augmentation | **100% (329/329)** | nothing on Round 3 |
+
+How v1 failed: with only 2 training layouts, each number sat on one or two specific tiles, and the terrain was easier to learn than the digit. Every big mistake matches a training-round pairing:
+
+| Round 3 truth | v1 predicted | tile under it in Round 3 | why |
+|---|---|---|---|
+| 12 | 4 (10 times) | brick | Round 1's brick has a 4 |
+| 11 | 10 (9 times) | wheat | Rounds 1 and 2 both have wheat 10 |
+| 9 | 5 (9 times) | ore | Round 1 has ore 5 |
+| 6 | 8 (7 times) | sheep, ore | Round 2 has sheep 8 and ore 8 |
+
+v1's validation loss rose from epoch 4 while training loss kept falling. v2's both fall together.
+
+The fix (`pipeline/tokens.py`):
+
+- `cv2.HoughCircles` finds the token. Every token is the same size on the rectified board, so the radius is limited to 23-32 px; allowing 22-45 picked up larger false circles. `token_circle_detection.jpg`.
+- The crop is recentered on the token and everything outside the circle is set to flat gray, so the only thing left to learn from is the digit and its dots.
+- Training crops where no token was found (41, about 4%) are skipped rather than kept as terrain-only images labeled with a number.
+- `fliplr=0.0`: a mirrored digit is not a real number.
+
+`tokens_before_after_isolation.jpg`, `tokens_v1_training_curves.png`, `tokens_v2_training_curves.png`.
+
+Known weakness: the circle finder occasionally locks onto a round shape in the terrain instead of the token (one such crop is visible in the 12 row of the before/after image). The model still scored 100%, but more layouts would make this rarer to matter.
