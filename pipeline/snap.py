@@ -10,8 +10,8 @@ from data_prep.click_corners import OUT, load_saved
 from data_prep.extract_crops import PAD, crop_box
 from pipeline.rectify import TILE_SIZE, compute_homography, find_image, warp
 
-WEIGHTS = Path("runs/detect/catan_v2/weights/best.pt")
-COLOR_WEIGHTS = Path("runs/classify/colors_v3/weights/best.pt")
+WEIGHTS = Path("runs/detect/catan_v3/weights/best.pt")
+COLOR_WEIGHTS = Path("runs/classify/colors_v2/weights/best.pt")
 COLOR_IMGSZ = 128
 IMGSZ = 1024
 CONF = 0.25
