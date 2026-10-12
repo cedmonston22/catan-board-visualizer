@@ -114,8 +114,9 @@ def main() -> None:
     if models is None:
         return
     board = build_board()
+    name = image_path.stem.split("_jpg")[0]
 
-    result = read_board(image, models, board, title=image_path.stem)
+    result = read_board(image, models, board, title=name)
     if result.problem:
         print(f"automatic corners failed ({result.problem}), click the 6 corners instead")
         try:
@@ -127,10 +128,10 @@ def main() -> None:
         if clicked is None:
             print("no corners, stopping")
             return
-        result = read_board(image, models, board, corners=clicked, title=image_path.stem)
+        result = read_board(image, models, board, corners=clicked, title=name)
 
     OUTPUT.mkdir(parents=True, exist_ok=True)
-    out_path = OUTPUT / f"{image_path.stem}.jpg"
+    out_path = OUTPUT / f"{name}.jpg"
     cv2.imwrite(str(out_path), result.rendered)
     print(summary(result))
     print(f"\nsaved {out_path}")

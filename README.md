@@ -55,7 +55,7 @@ The full story, with every experiment, failure, and number, is in [docs/progress
 
 ## Running it
 
-Requires Python 3.14; an NVIDIA GPU is recommended. Main packages: `ultralytics` (with PyTorch), `opencv-python`, `numpy`, `pyyaml`.
+Requires Python 3.14; an NVIDIA GPU is recommended. Install the pinned versions with `pip install -r requirements.txt` (it pulls the CUDA 13.0 build of PyTorch from the PyTorch package index).
 
 The trained weights are not in the repository (`runs/` is git-ignored), so the models have to be trained first; see the training section below.
 
