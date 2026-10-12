@@ -9,7 +9,7 @@ OUT_SIZE = 96
 GRAY = (114, 114, 114)
 
 
-def find_token(crop: np.ndarray) -> tuple[int, int, int] | None:
+def find_token(crop: np.ndarray, max_offset: int = MAX_OFFSET) -> tuple[int, int, int] | None:
     h, w = crop.shape[:2]
     gray = cv2.medianBlur(cv2.cvtColor(crop, cv2.COLOR_BGR2GRAY), 5)
     circles = cv2.HoughCircles(gray, cv2.HOUGH_GRADIENT, dp=1, minDist=8, param1=80, param2=16,
@@ -17,14 +17,14 @@ def find_token(crop: np.ndarray) -> tuple[int, int, int] | None:
     if circles is None:
         return None
     for x, y, r in circles[0]:
-        if np.hypot(x - w / 2, y - h / 2) < MAX_OFFSET:
+        if np.hypot(x - w / 2, y - h / 2) < max_offset:
             return int(x), int(y), int(r)
     return None
 
 
-def isolate_token(crop: np.ndarray) -> np.ndarray:
+def isolate_token(crop: np.ndarray, max_offset: int = MAX_OFFSET) -> np.ndarray:
     h, w = crop.shape[:2]
-    found = find_token(crop)
+    found = find_token(crop, max_offset)
     x, y, r = found if found else (w // 2, h // 2, DEFAULT_RADIUS)
 
     half = r + 2

@@ -8,21 +8,15 @@ import numpy as np
 from data_prep.apply_masks import DATASET as DETECT_DATASET
 from data_prep.apply_masks import load_names, read_labels
 from data_prep.click_corners import OUT, load_saved
+from pipeline.hexes import HEX_HALF, TOKEN_HALF, crop_square
 from pipeline.layout import ROTATIONS, ROUNDS, rotation_perm, warped_photo
-from pipeline.rectify import TILE_SIZE, compute_homography, find_image, tile_centers
+from pipeline.rectify import compute_homography, find_image, tile_centers
 from pipeline.tokens import find_token, isolate_token
 
 TILE_LABELS = Path("data/tiles.json")
 TILES_OUT = Path("datasets/tiles")
 TOKENS_OUT = Path("datasets/tokens")
 VAL_ROUNDS = {"3"}
-HEX_HALF = int(TILE_SIZE * 0.9)
-TOKEN_HALF = int(TILE_SIZE * 0.6)
-
-
-def crop_square(image: np.ndarray, center: tuple[float, float], half: int) -> np.ndarray:
-    x, y = int(center[0]), int(center[1])
-    return image[max(0, y - half):y + half, max(0, x - half):x + half]
 
 
 def robber_tile(pid: str, homography: np.ndarray, names: list[str]) -> int | None:
