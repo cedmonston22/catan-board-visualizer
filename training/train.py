@@ -11,7 +11,7 @@ def main():
         imgsz=1024,
         batch=4,
         workers=0,
-        name="catan_v2"
+        name="catan_v3"
     )
     
     
