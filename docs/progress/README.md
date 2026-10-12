@@ -166,3 +166,53 @@ Takeaways:
 - A high accuracy score only measures agreement with the labels. A model trained on a wrong label will confidently reproduce it, and an audit against those same labels will pass.
 - Both bad labels were automatic pre-labels. Review catches most of these, but not all, especially when the background resembles another player's color (sea vs blue, warm light vs orange).
 - Checks that come from the domain, like the road rule here or the token counts in deduction, catch errors that the data alone can't. The road rule is a good candidate for a permanent check that flags suspicious pieces in the pipeline.
+
+### Tested, not adopted: rescuing low-confidence roads
+
+test01 is missing one road: the detector saw it at only 14% confidence (below the 25% cutoff) because a settlement hides half of it, in a room the detector never trained on.
+
+- Lowering the cutoff globally recovers nothing on the 57 labeled photos (the same 2 pieces are missed at every cutoff from 25% down to 5%) while false pieces rise from 7 to 14.
+- A targeted rule was tested instead: accept a 10-25% road only if its edge is empty and both ends touch a piece of the same color. It recovers exactly the test01 road and never fires on the 57 labeled photos (0 false pieces).
+- Not adopted yet: it is safe, but one rescued road is not enough evidence that it matters. Worth revisiting once there are more photos from new rooms.
+
+## Automatic corners and read_board
+
+The last manual step was clicking 6 corners per photo. The product goal is to take a photo and get the board and scores, so corners have to be found automatically.
+
+### Corner detector
+
+- The 348 clicked corners (58 photos x 6) became training labels for free: each click is a small box, sized at 25% of the distance between neighboring corners so it scales with the board. `corner_training_boxes.jpg`.
+- YOLO11s, imgsz 1024, 39 training photos. Round 3: precision 0.92, recall 0.84, mAP50 0.91. mAP50-95 is only 0.49, but only the box centers matter here.
+
+### Choosing the 6 corners
+
+| step | Round 3 photos accepted | notes |
+|---|---|---|
+| take the 6 most confident boxes | 7 / 18 | duplicates: two boxes on one corner, another corner missed |
+| remove duplicates, try every combination of 6, keep the most board-shaped | 14 / 18 | the rest have one corner hidden or missed |
+| also complete a hidden 6th corner from 5 found ones | 17 / 18 | **rejected**: some "passing" boards were 400 px wrong |
+| completion, but only accepted if the rectified board passes the tile check | 17 / 18 | safe |
+
+Completing from 5 corners failed at first because a homography has 8 unknowns and 5 points give 10 equations, so almost any 5 points fit almost perfectly. The fit error said nothing.
+
+The tile check: rectify with the candidate corners, classify the 19 hexes, and accept only if the counts are exactly 4 wood, 4 sheep, 4 wheat, 3 brick, 3 ore, 1 desert with average confidence of at least 80%. Wrong corners turn sea and table edges into "tiles", which fail the counts or the confidence. It is the same pattern as the other fixes: check the answer against the rules of the game.
+
+### End to end: automatic vs clicked corners, all 58 photos
+
+| | photos |
+|---|---|
+| same scores as with clicked corners | 53 |
+| different scores | 2 (test01, round03_13) |
+| rejected, so the corners need to be placed by hand | 3 |
+
+53 of the 55 accepted boards end with the right scores (96%). The 2 misses have one corner 60-90 px off: close enough for the tiles to pass, stretched enough to move a piece or misread a token. `auto_vs_clicked_corners_test01.jpg`: in the stretched top-right area, the brick 5 reads as a 12 and two red pieces fall off their spots. Deduction then sees two 12s and correctly refuses to guess the robber's number.
+
+This is the corner detector's limit (39 photos from one table), and the main reason to collect new photos in different rooms next.
+
+### read_board
+
+`python -m pipeline.read_board photo.jpg`: any photo in, board and scores out, no corner file. `read_board_round03_15.jpg`.
+
+- Built around one function, `read_board(image, models, board, corners=None)`, that works on an image in memory and returns a `BoardResult`: corners (automatic or manual), pieces, hexes, scores, the rendered board, and plain-language warnings.
+- If the automatic corners fail the checks, it returns a problem instead of a wrong board. The command line then opens the click window for that photo; the future phone page will show draggable corners instead.
+- The future web app calls the same function, so the phone and the command line give identical answers.
