@@ -4,7 +4,13 @@ from pathlib import Path
 import cv2
 import numpy as np
 
-IMAGES = [Path("datasets/catan/train/images"), Path("datasets/catan/valid/images"), Path("datasets/test_photos")]
+IMAGES = [
+    Path("datasets/catan/train/images"),
+    Path("datasets/catan/valid/images"),
+    Path("datasets/test_photos"),
+    Path("datasets/raw/round04"),
+    Path("datasets/raw/round05"),
+]
 ONLY = set()
 OUT = Path("data/corners.json")
 WINDOW = "click corners"
