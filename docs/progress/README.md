@@ -267,3 +267,24 @@ The road rule (a building should touch a road of its own color) and a second rul
 
 - Never rebuild a dataset while a model is training on it: the builders wipe their folder, and the tile training crashed at epoch 9 when its images disappeared.
 - Improving one model exposes the next weakest: better corners revealed that the tile classifier was the real reason boards were rejected.
+
+## Unseen test photos
+
+Four photos never used for training or validation, with the true score of every player written down before running anything. Run exactly as the app would: `read_board` with automatic corners, no manual help, with catan_v3, colors_v4, corners_v2, and tiles_v2.
+
+| photo | result | what went wrong |
+|---|---|---|
+| test02 | blue 3 (should be 2), white 1 (should be 2) | a notch in the blue sea frame detected as a settlement at 29% confidence and colored blue, and one white settlement missed |
+| test03 | all 4 players right | |
+| test04 | all 4 players right | |
+| test05 | red 5 points (should be 6) | a red city read as a settlement |
+
+- **2 of 4 photos fully right, 14 of 16 player scores right.** Longest Road (nobody, in all 4) right every time.
+- **Automatic corners: 4 / 4.** Before Rounds 4-5, half the photos from this room were rejected.
+- **Colors: no mistakes** on any piece the detector found.
+- **Pieces are the remaining weak spot:** all 3 mistakes are detection (one phantom piece, one missed piece, one city/settlement swap).
+- Number reading was not scored: there is no tile-layout answer key for these photos, so tokens_v2 vs v3 is still open.
+
+How much to trust it: 4 photos is a small sample, all in the Round 4 room (new layouts and game states, but a familiar setting), and two share a layout. Neither error was tuned away: raising the confidence cutoff would remove the phantom piece, but that is fitting to one photo, and the earlier cutoff sweep showed it trades false pieces for missed ones.
+
+`unseen_test04.jpg`: a fully correct photo and its regenerated board. `unseen_test_errors.jpg`: the pieces behind the two wrong scores.
