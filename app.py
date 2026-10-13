@@ -10,12 +10,13 @@ import numpy as np
 import spaces
 import torch
 
-from pipeline.board import build_board
+from pipeline.board import build_board, edge_midpoint
 from pipeline.corners import clockwise_from_top, is_convex_hexagon
 from pipeline.read_board import BoardResult, Models, load_models, read_board
-from pipeline.rectify import CANVAS
-from pipeline.render import SEA_BGR
-from pipeline.snap import PLAYER_BGR
+from pipeline.rectify import CANVAS, TILE_SIZE
+from pipeline.render import SEA_BGR, render_board
+from pipeline.score import PLAYERS, score
+from pipeline.snap import PLAYER_BGR, Placement
 
 logger = logging.getLogger("catan_app")
 logging.basicConfig(level=logging.INFO)
@@ -24,11 +25,14 @@ GUIDE = "assets/corner_guide.jpg"
 DISPLAY_MAX = 1280
 NUM_CORNERS = 6
 SLIDE_SECONDS = 0.9
+SELECT_RADIUS = 0.4 * TILE_SIZE
+BUILDINGS = ["settlement", "city"]
+HIGHLIGHT_BGR = (0, 230, 255)
 
 CSS = f"""
 #title h1 {{ font-size: 1.4rem; margin: 0; }}
-#taps img {{ max-height: 62vh; width: 100%; object-fit: contain; }}
-#actions {{ flex-wrap: nowrap; gap: 8px; }}
+#taps img, #editor img {{ max-height: 62vh; width: 100%; object-fit: contain; }}
+#actions, #edit-actions {{ flex-wrap: nowrap; gap: 8px; }}
 #guide img {{ width: 100%; object-fit: contain; }}
 #stage .html-container {{ padding: 0 !important; }}
 #stage .stage {{ position: relative; overflow: hidden; border-radius: 8px; background: #111; }}
@@ -45,6 +49,9 @@ CSS = f"""
 #info .notes {{ font-size: 0.8rem; opacity: 0.75; margin-top: 4px; }}
 """
 
+VIEW_NAMES = ["photo", "taps", "editor", "stage", "info", "state", "undo", "read_corners", "fix", "edit", "new",
+              "guide", "piece", "color", "save", "remove", "done"]
+
 
 @dataclass
 class Session:
@@ -52,6 +59,11 @@ class Session:
     display_bgr: np.ndarray
     scale: float
     taps: list[tuple[int, int]] = field(default_factory=list)
+    result: BoardResult | None = None
+    seconds: float = 0.0
+    selected: tuple[str, int] | None = None
+    last_color: str | None = None
+    edits: int = 0
 
 
 def load_app_models() -> Models:
@@ -66,6 +78,8 @@ def load_app_models() -> Models:
 
 MODELS = load_app_models()
 BOARD = build_board()
+VERTEX_POINTS = np.array(BOARD.vertices, dtype=np.float32)
+EDGE_POINTS = np.array([edge_midpoint(BOARD, i) for i in range(len(BOARD.edges))], dtype=np.float32)
 
 
 @spaces.GPU(duration=30)
@@ -80,18 +94,20 @@ def make_session(image_rgb: np.ndarray) -> Session:
     return Session(image_bgr, display, scale)
 
 
-def run(session: Session, corners: list[list[float]] | None) -> tuple[BoardResult, float]:
+def run(session: Session, corners: list[list[float]] | None) -> BoardResult:
     start = time.perf_counter()
     try:
         result = analyze(session.image_bgr, corners)
     except Exception as error:
         logger.exception("reading the board failed")
         raise gr.Error(f"Couldn't read this photo: {error}") from error
-    seconds = time.perf_counter() - start
+    session.seconds = time.perf_counter() - start
     h, w = session.image_bgr.shape[:2]
-    logger.info("read %dx%d photo in %.2f s, corners=%s, problem=%s", w, h, seconds,
+    logger.info("read %dx%d photo in %.2f s, corners=%s, problem=%s", w, h, session.seconds,
                 "manual" if corners else "auto", result.problem)
-    return result, seconds
+    if result.problem is None:
+        session.result, session.selected, session.edits = result, None, 0
+    return result
 
 
 def data_url(image_bgr: np.ndarray) -> str:
@@ -101,10 +117,14 @@ def data_url(image_bgr: np.ndarray) -> str:
     return "data:image/jpeg;base64," + base64.b64encode(encoded.tobytes()).decode("ascii")
 
 
-def stage_html(session: Session, result: BoardResult) -> str:
-    board_only = result.rendered[:, :CANVAS]
+def board_only(result: BoardResult) -> np.ndarray:
+    return result.rendered[:, :CANVAS]
+
+
+def stage_html(session: Session) -> str:
     return (f'<div class="stage"><img class="photo" src="{data_url(session.display_bgr)}" alt="board photo">'
-            f'<div class="board-layer"><img src="{data_url(board_only)}" alt="regenerated board"></div></div>')
+            f'<div class="board-layer"><img src="{data_url(board_only(session.result))}" alt="regenerated board">'
+            f'</div></div>')
 
 
 def css_color(color: str) -> str:
@@ -112,13 +132,15 @@ def css_color(color: str) -> str:
     return f"rgb({r}, {g}, {b})"
 
 
-def result_info(result: BoardResult, seconds: float) -> str:
+def scores_html(session: Session) -> str:
+    result = session.result
     players = "".join(
         f'<span><span class="dot" style="background:{css_color(s.color)}"></span>{s.color} {s.points}'
         f'{" (Longest Road)" if s.has_longest_road else ""}</span>'
         for s in result.scores
     ) or "<span>No pieces found on the board</span>"
-    notes = " · ".join(result.warnings + [f"read in {seconds:.1f} s"])
+    edited = [f"{session.edits} edit(s) by hand"] if session.edits else []
+    notes = " · ".join(result.warnings + edited + [f"read in {session.seconds:.1f} s"])
     return f'<div class="scores">{players}</div><div class="notes">{notes}</div>'
 
 
@@ -148,35 +170,97 @@ def tap_image(session: Session) -> np.ndarray:
     return cv2.cvtColor(canvas, cv2.COLOR_BGR2RGB)
 
 
+def nearest_spot(x: float, y: float) -> tuple[str, int] | None:
+    point = np.array([x, y], dtype=np.float32)
+    vertex_distances = np.linalg.norm(VERTEX_POINTS - point, axis=1)
+    edge_distances = np.linalg.norm(EDGE_POINTS - point, axis=1)
+    vertex, edge = int(vertex_distances.argmin()), int(edge_distances.argmin())
+    if min(vertex_distances[vertex], edge_distances[edge]) > SELECT_RADIUS:
+        return None
+    return ("vertex", vertex) if vertex_distances[vertex] <= edge_distances[edge] else ("edge", edge)
+
+
+def placement_at(session: Session, spot: tuple[str, int]) -> Placement | None:
+    kind, target = spot
+    return next((p for p in session.result.placements if p.kind == kind and p.target == target), None)
+
+
+def spot_point(spot: tuple[str, int]) -> tuple[int, int]:
+    kind, target = spot
+    x, y = BOARD.vertices[target] if kind == "vertex" else edge_midpoint(BOARD, target)
+    return int(x), int(y)
+
+
+def edit_image(session: Session) -> np.ndarray:
+    canvas = board_only(session.result).copy()
+    if session.selected:
+        center = spot_point(session.selected)
+        cv2.circle(canvas, center, 26, (0, 0, 0), 7, cv2.LINE_AA)
+        cv2.circle(canvas, center, 26, HIGHLIGHT_BGR, 4, cv2.LINE_AA)
+    return cv2.cvtColor(canvas, cv2.COLOR_BGR2RGB)
+
+
+def rescore(session: Session) -> None:
+    result = session.result
+    result.scores = score(BOARD, result.placements)
+    result.rendered = render_board(BOARD, result.hexes, result.placements, result.scores, "")
+
+
+def view(**shown: object) -> tuple:
+    values = {name: gr.update(visible=False) for name in VIEW_NAMES}
+    values["info"], values["state"] = gr.update(), gr.update()
+    values.update(shown)
+    return tuple(values[name] for name in VIEW_NAMES)
+
+
 def upload_view() -> tuple:
-    return (gr.update(value=None, visible=True), gr.update(value=None, visible=False), gr.update(value="", visible=False),
-            "", None, gr.update(visible=False), gr.update(visible=False), gr.update(visible=False),
-            gr.update(visible=False), gr.update(visible=False))
+    return view(photo=gr.update(value=None, visible=True), taps=gr.update(value=None, visible=False),
+                editor=gr.update(value=None, visible=False), stage=gr.update(value="", visible=False),
+                info="Take a photo of the whole board from above.", state=None)
 
 
 def tap_view(session: Session, message: str = "") -> tuple:
-    return (gr.update(visible=False), gr.update(value=tap_image(session), visible=True),
-            gr.update(value="", visible=False), tap_info(session, message), session,
-            gr.update(visible=True, interactive=bool(session.taps)),
-            gr.update(visible=True, interactive=len(session.taps) == NUM_CORNERS), gr.update(visible=False),
-            gr.update(visible=True), gr.update(visible=True))
+    return view(taps=gr.update(value=tap_image(session), visible=True), info=tap_info(session, message), state=session,
+                undo=gr.update(visible=True, interactive=bool(session.taps)),
+                read_corners=gr.update(visible=True, interactive=len(session.taps) == NUM_CORNERS),
+                new=gr.update(visible=True), guide=gr.update(visible=True))
 
 
-def result_view(session: Session, result: BoardResult, seconds: float) -> tuple:
-    return (gr.update(visible=False), gr.update(value=None, visible=False),
-            gr.update(value=stage_html(session, result), visible=True), result_info(result, seconds), session,
-            gr.update(visible=False), gr.update(visible=False), gr.update(visible=True), gr.update(visible=True),
-            gr.update(visible=False))
+def result_view(session: Session) -> tuple:
+    return view(stage=gr.update(value=stage_html(session), visible=True), info=scores_html(session), state=session,
+                fix=gr.update(visible=True), edit=gr.update(visible=True), new=gr.update(visible=True))
+
+
+def edit_view(session: Session, message: str = "") -> tuple:
+    selected = session.selected
+    if selected is None:
+        prompt = message or "Tap a road spot or a building spot to add, change or remove a piece."
+        return view(editor=gr.update(value=edit_image(session), visible=True),
+                    info=f"{scores_html(session)}<div><b>{prompt}</b></div>", state=session,
+                    done=gr.update(visible=True))
+    current = placement_at(session, selected)
+    is_vertex = selected[0] == "vertex"
+    what = "building spot" if is_vertex else "road spot"
+    status = f"{current.color or 'uncolored'} {current.piece}" if current else "empty"
+    prompt = message or f"Selected {what} ({status}). Choose {'type and ' if is_vertex else ''}color, then save."
+    piece_value = current.piece if current and current.piece in BUILDINGS else "settlement"
+    color_value = current.color if current and current.color in PLAYERS else session.last_color
+    return view(editor=gr.update(value=edit_image(session), visible=True),
+                info=f"{scores_html(session)}<div><b>{prompt}</b></div>", state=session,
+                piece=gr.update(visible=is_vertex, value=piece_value),
+                color=gr.update(visible=True, value=color_value),
+                save=gr.update(visible=True), remove=gr.update(visible=current is not None),
+                done=gr.update(visible=True))
 
 
 def on_upload_photo(image_rgb: np.ndarray | None) -> tuple:
     if image_rgb is None:
         return upload_view()
     session = make_session(image_rgb)
-    result, seconds = run(session, None)
+    result = run(session, None)
     if result.problem:
         return tap_view(session, f"Couldn't find the corners automatically ({result.problem}).")
-    return result_view(session, result, seconds)
+    return result_view(session)
 
 
 def on_select_tap(session: Session | None, evt: gr.SelectData) -> tuple:
@@ -204,10 +288,10 @@ def on_click_read_corners(session: Session | None) -> tuple:
     ordered = clockwise_from_top(np.array(session.taps, dtype=np.float32) / session.scale)
     if not is_convex_hexagon(ordered):
         return tap_view(session, "Those taps don't make a hexagon. Undo and tap the beach points shown in the example.")
-    result, seconds = run(session, ordered.tolist())
+    result = run(session, ordered.tolist())
     if result.problem:
         return tap_view(session, f"Couldn't read the board with these corners ({result.problem}).")
-    return result_view(session, result, seconds)
+    return result_view(session)
 
 
 def on_click_fix_corners(session: Session | None) -> tuple:
@@ -217,6 +301,61 @@ def on_click_fix_corners(session: Session | None) -> tuple:
     return tap_view(session)
 
 
+def on_click_edit(session: Session | None) -> tuple:
+    if session is None or session.result is None:
+        return upload_view()
+    session.selected = None
+    return edit_view(session)
+
+
+def on_select_spot(session: Session | None, evt: gr.SelectData) -> tuple:
+    if session is None or session.result is None:
+        return upload_view()
+    spot = nearest_spot(*evt.index) if evt.index is not None else None
+    if spot is None:
+        session.selected = None
+        return edit_view(session, "Tap closer to a corner (building) or the middle of an edge (road).")
+    session.selected = spot
+    return edit_view(session)
+
+
+def on_click_save(session: Session | None, piece: str | None, color: str | None) -> tuple:
+    if session is None or session.result is None:
+        return upload_view()
+    if session.selected is None:
+        return edit_view(session)
+    if color not in PLAYERS:
+        return edit_view(session, "Pick a color first.")
+    kind, target = session.selected
+    new_piece = piece if kind == "vertex" and piece in BUILDINGS else "road"
+    current = placement_at(session, session.selected)
+    placements = [p for p in session.result.placements if p is not current]
+    placements.append(Placement(new_piece, 1.0, kind, target, 0.0, color))
+    session.result.placements = placements
+    session.last_color, session.edits, session.selected = color, session.edits + 1, None
+    rescore(session)
+    return edit_view(session, f"Saved {color} {new_piece}. Tap another spot, or Done.")
+
+
+def on_click_remove(session: Session | None) -> tuple:
+    if session is None or session.result is None:
+        return upload_view()
+    current = placement_at(session, session.selected) if session.selected else None
+    if current is None:
+        return edit_view(session)
+    session.result.placements = [p for p in session.result.placements if p is not current]
+    session.edits, session.selected = session.edits + 1, None
+    rescore(session)
+    return edit_view(session, f"Removed {current.color or 'uncolored'} {current.piece}. Tap another spot, or Done.")
+
+
+def on_click_done(session: Session | None) -> tuple:
+    if session is None or session.result is None:
+        return upload_view()
+    session.selected = None
+    return result_view(session)
+
+
 def build_ui() -> gr.Blocks:
     with gr.Blocks(title="Catan Board Reader") as demo:
         gr.Markdown("# Catan Board Reader", elem_id="title")
@@ -224,22 +363,40 @@ def build_ui() -> gr.Blocks:
         photo = gr.Image(type="numpy", sources=["upload"], image_mode="RGB", show_label=False, buttons=[],
                          elem_id="photo")
         taps = gr.Image(type="numpy", interactive=False, show_label=False, buttons=[], visible=False, elem_id="taps")
+        editor = gr.Image(type="numpy", interactive=False, show_label=False, buttons=[], visible=False,
+                          elem_id="editor")
         stage = gr.HTML(elem_id="stage", visible=False, padding=False)
         info = gr.HTML("Take a photo of the whole board from above.", elem_id="info")
+        piece = gr.Radio(BUILDINGS, label="Type", visible=False)
+        color = gr.Radio(PLAYERS, label="Color", visible=False)
+        with gr.Row(elem_id="edit-actions"):
+            save_button = gr.Button("Save", variant="primary", size="sm", visible=False, min_width=0)
+            remove_button = gr.Button("Remove", size="sm", visible=False, min_width=0)
+            done_button = gr.Button("Done", size="sm", visible=False, min_width=0)
         with gr.Row(elem_id="actions"):
             undo_button = gr.Button("Undo", size="sm", visible=False, min_width=0)
             corners_button = gr.Button("Read board", variant="primary", size="sm", visible=False, min_width=0)
             fix_button = gr.Button("Fix corners", size="sm", visible=False, min_width=0)
+            edit_button = gr.Button("Edit pieces", size="sm", visible=False, min_width=0)
             new_button = gr.Button("New photo", size="sm", visible=False, min_width=0)
         guide = gr.Image(GUIDE, interactive=False, show_label=False, buttons=[], visible=False, elem_id="guide")
 
-        outputs = [photo, taps, stage, info, state, undo_button, corners_button, fix_button, new_button, guide]
+        components = {"photo": photo, "taps": taps, "editor": editor, "stage": stage, "info": info, "state": state,
+                      "undo": undo_button, "read_corners": corners_button, "fix": fix_button, "edit": edit_button,
+                      "new": new_button, "guide": guide, "piece": piece, "color": color, "save": save_button,
+                      "remove": remove_button, "done": done_button}
+        outputs = [components[name] for name in VIEW_NAMES]
         photo.upload(on_upload_photo, inputs=photo, outputs=outputs, api_name="read")
         photo.clear(upload_view, outputs=outputs, api_name=False)
         taps.select(on_select_tap, inputs=state, outputs=outputs, api_name=False)
         undo_button.click(on_click_undo, inputs=state, outputs=outputs, api_name=False)
         corners_button.click(on_click_read_corners, inputs=state, outputs=outputs, api_name="read_corners")
         fix_button.click(on_click_fix_corners, inputs=state, outputs=outputs, api_name=False)
+        edit_button.click(on_click_edit, inputs=state, outputs=outputs, api_name=False)
+        editor.select(on_select_spot, inputs=state, outputs=outputs, api_name=False)
+        save_button.click(on_click_save, inputs=[state, piece, color], outputs=outputs, api_name=False)
+        remove_button.click(on_click_remove, inputs=state, outputs=outputs, api_name=False)
+        done_button.click(on_click_done, inputs=state, outputs=outputs, api_name=False)
         new_button.click(upload_view, outputs=outputs, api_name=False)
     return demo
 
