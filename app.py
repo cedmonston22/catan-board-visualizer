@@ -5,6 +5,7 @@ import time
 from dataclasses import dataclass, field
 from pathlib import Path
 
+import spaces
 import cv2
 import gradio as gr
 import numpy as np
@@ -93,6 +94,11 @@ EDGE_POINTS = np.array([edge_midpoint(BOARD, i) for i in range(len(BOARD.edges))
 
 def analyze(image_bgr: np.ndarray, corners: list[list[float]] | None = None) -> BoardResult:
     return read_board(image_bgr, MODELS, BOARD, corners=corners)
+
+
+@spaces.GPU(duration=1)
+def zerogpu_startup_check() -> None:
+    return None
 
 
 def make_session(image_rgb: np.ndarray) -> Session:
