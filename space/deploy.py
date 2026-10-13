@@ -13,14 +13,15 @@ from pipeline.weights import MANIFEST, MODEL_NAMES, weights_path
 SPACE_ID = "cedmonst22/Catan-Board-Visualizer"
 SPACE_FILES = {"space/README.md": "README.md", "space/requirements.txt": "requirements.txt",
                "space/packages.txt": "packages.txt"}
-CODE_FILES = ["app.py", "assets/corner_guide.jpg", "data_prep/__init__.py", "data_prep/apply_masks.py",
-              "data_prep/click_corners.py", "data_prep/extract_crops.py"]
+CODE_FILES = ["app.py", "data_prep/__init__.py", "data_prep/apply_masks.py", "data_prep/click_corners.py",
+              "data_prep/extract_crops.py"]
 KEEP_REMOTE = {".gitattributes"}
 
 
 def files_to_upload() -> dict[str, Path]:
     files = {name: Path(name) for name in CODE_FILES}
     files.update({path.as_posix(): path for path in sorted(Path("pipeline").glob("*.py"))})
+    files.update({path.as_posix(): path for path in sorted(Path("assets").rglob("*")) if path.is_file()})
     files[MANIFEST.as_posix()] = MANIFEST
     files.update({weights_path(name).as_posix(): weights_path(name) for name in MODEL_NAMES})
     files.update({remote: Path(local) for local, remote in SPACE_FILES.items()})

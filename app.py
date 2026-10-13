@@ -3,6 +3,7 @@ import logging
 import sys
 import time
 from dataclasses import dataclass, field
+from pathlib import Path
 
 import cv2
 import gradio as gr
@@ -22,6 +23,7 @@ logger = logging.getLogger("catan_app")
 logging.basicConfig(level=logging.INFO)
 
 GUIDE = "assets/corner_guide.jpg"
+EXAMPLES = sorted(Path("assets/examples").glob("*.jpg"))
 DISPLAY_MAX = 1280
 NUM_CORNERS = 6
 SLIDE_SECONDS = 0.9
@@ -60,7 +62,7 @@ CSS = f"""
 """
 
 VIEW_NAMES = ["photo", "taps", "editor", "stage", "info", "state", "undo", "read_corners", "fix", "edit", "new",
-              "guide", "piece", "color", "save", "remove", "done"]
+              "guide", "piece", "color", "save", "remove", "done", "examples"]
 
 
 @dataclass
@@ -252,7 +254,8 @@ def view(**shown: object) -> tuple:
 def upload_view() -> tuple:
     return view(photo=gr.update(value=None, visible=True), taps=gr.update(value=None, visible=False),
                 editor=gr.update(value=None, visible=False), stage=gr.update(value="", visible=False),
-                info="Take a photo of the whole board from above.", state=None)
+                info="Take a photo of the whole board from above.", state=None,
+                examples=gr.update(visible=True))
 
 
 def tap_view(session: Session, message: str = "") -> tuple:
@@ -405,6 +408,7 @@ def build_ui() -> gr.Blocks:
                           elem_id="editor")
         stage = gr.HTML(elem_id="stage", visible=False, padding=False)
         info = gr.HTML("Take a photo of the whole board from above.", elem_id="info")
+        examples_box = gr.Column(visible=bool(EXAMPLES), elem_id="examples")
         piece = gr.Radio(BUILDINGS, label="Type", visible=False)
         color = gr.Radio(PLAYERS, label="Color", visible=False)
         with gr.Row(elem_id="edit-actions"):
@@ -422,8 +426,12 @@ def build_ui() -> gr.Blocks:
         components = {"photo": photo, "taps": taps, "editor": editor, "stage": stage, "info": info, "state": state,
                       "undo": undo_button, "read_corners": corners_button, "fix": fix_button, "edit": edit_button,
                       "new": new_button, "guide": guide, "piece": piece, "color": color, "save": save_button,
-                      "remove": remove_button, "done": done_button}
+                      "remove": remove_button, "done": done_button, "examples": examples_box}
         outputs = [components[name] for name in VIEW_NAMES]
+        if EXAMPLES:
+            with examples_box:
+                gr.Examples([[str(path)] for path in EXAMPLES], inputs=photo, outputs=outputs, fn=on_upload_photo,
+                            run_on_click=True, cache_examples=False, label="No board handy? Tap an example")
         photo.upload(on_upload_photo, inputs=photo, outputs=outputs, api_name="read")
         photo.clear(upload_view, outputs=outputs, api_name=False)
         taps.select(on_select_tap, inputs=state, outputs=outputs, api_name=False)
