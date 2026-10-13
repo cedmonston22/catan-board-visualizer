@@ -8,8 +8,6 @@ from pathlib import Path
 import cv2
 import gradio as gr
 import numpy as np
-import spaces
-import torch
 
 from pipeline.board import build_board, edge_midpoint
 from pipeline.corners import clockwise_from_top, is_convex_hexagon
@@ -82,9 +80,8 @@ def load_app_models() -> Models:
     models = load_models()
     if models is None:
         raise RuntimeError("models are missing from models/, promote them with python -m pipeline.promote")
-    if torch.cuda.is_available():
-        for model in (models.pieces, models.colors, models.corners, models.tiles, models.tokens):
-            model.to("cuda")
+    for model in (models.pieces, models.colors, models.corners, models.tiles, models.tokens):
+        model.overrides["device"] = "cpu"
     return models
 
 
@@ -94,7 +91,6 @@ VERTEX_POINTS = np.array(BOARD.vertices, dtype=np.float32)
 EDGE_POINTS = np.array([edge_midpoint(BOARD, i) for i in range(len(BOARD.edges))], dtype=np.float32)
 
 
-@spaces.GPU(duration=30)
 def analyze(image_bgr: np.ndarray, corners: list[list[float]] | None = None) -> BoardResult:
     return read_board(image_bgr, MODELS, BOARD, corners=corners)
 
