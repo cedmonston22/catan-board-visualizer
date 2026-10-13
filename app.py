@@ -400,8 +400,8 @@ def on_click_done(session: Session | None) -> tuple:
 
 
 def build_ui() -> gr.Blocks:
-    with gr.Blocks(title="Catan Board Reader") as demo:
-        gr.Markdown("# Catan Board Reader", elem_id="title")
+    with gr.Blocks(title="Catan Board Visualizer") as demo:
+        gr.Markdown("# Catan Board Visualizer", elem_id="title")
         state = gr.State(None)
         photo = gr.Image(type="numpy", sources=["upload"], image_mode="RGB", show_label=False, buttons=[],
                          elem_id="photo")
