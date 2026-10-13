@@ -16,6 +16,7 @@ COLOR_WEIGHTS = weights_path("colors")
 COLOR_IMGSZ = 128
 IMGSZ = 1024
 CONF = 0.25
+RESCUE_CONF = 0.10 
 BASE_FRACTION = 0.75
 MAX_SNAP = 0.5 * TILE_SIZE
 OUTPUT = Path("outputs/snapped")
@@ -39,15 +40,19 @@ class Placement:
     color: str | None = None
 
 
-def detect(model: YOLO, image: np.ndarray) -> list[Detection]:
-    result = model.predict(image, imgsz=IMGSZ, conf=CONF, verbose=False)[0]
+def detect(model: YOLO, image: np.ndarray) -> tuple[list[Detection], list[Detection]]:
+    result = model.predict(image, imgsz=IMGSZ, conf=RESCUE_CONF, verbose=False)[0]
     boxes = result.boxes.xyxy.tolist()
     classes = result.boxes.cls.tolist()
     confs = result.boxes.conf.tolist()
-    return [
-        Detection(piece=result.names[int(cls)], conf=conf, box=tuple(box))
-        for box, cls, conf in zip(boxes, classes, confs)
-    ]
+    confident, rescue_candidates = [], []
+    for box, cls, conf in zip(boxes, classes, confs):
+        piece = result.names[int(cls)]
+        if conf >= CONF:
+            confident.append(Detection(piece=piece, conf=conf, box=tuple(box)))
+        elif piece == "road":
+            rescue_candidates.append(Detection(piece=piece, conf=conf, box=tuple(box)))
+    return confident, rescue_candidates
 
 
 def color_detections(detections: list[Detection], image: np.ndarray, color_model: YOLO) -> None:
@@ -121,6 +126,30 @@ def resolve_conflicts(placements: list[Placement]) -> list[Placement]:
         elif p.conf > best[p.kind, p.target].conf:
             best[p.kind, p.target] = p
     return list(best.values())
+
+
+def touches_color(vertex: int, color: str | None, placements: list[Placement], board: Board) -> bool:
+    for p in placements:
+        if p.color != color:
+            continue
+        if p.kind == "vertex" and p.target == vertex:
+            return True
+        if p.kind == "edge" and vertex in board.edges[p.target]:
+            return True
+    return False
+
+
+def rescue_roads(candidates: list[Placement], placements: list[Placement], board: Board) -> list[Placement]:
+    taken = {p.target for p in placements if p.kind == "edge"}
+    rescued = []
+    for c in sorted(candidates, key=lambda c: c.conf, reverse=True):
+        if c.color is None or c.target in taken:
+            continue
+        a, b = board.edges[c.target]
+        if touches_color(a, c.color, placements, board) and touches_color(b, c.color, placements, board):
+            rescued.append(c)
+            taken.add(c.target)
+    return placements + rescued
 
 
 PIECES = ["settlement", "city", "road", "robber"]
@@ -207,10 +236,11 @@ def load_pipeline() -> tuple[YOLO, YOLO, dict[str, list[list[float]]]] | None:
 
 def read_image(image: np.ndarray, corners: list[list[float]], model: YOLO, color_model: YOLO, board: Board) -> Reading:
     homography = compute_homography(corners)
-    detections = detect(model, image)
-    color_detections(detections, image, color_model)
+    detections, candidates = detect(model, image)
+    color_detections(detections + candidates, image, color_model)
     snapped = snap(detections, homography, board)
-    return Reading(image, homography, detections, snapped, resolve_conflicts(snapped))
+    placements = rescue_roads(snap(candidates, homography, board), resolve_conflicts(snapped), board)
+    return Reading(image, homography, detections, snapped, placements)
 
 
 def read_photo(pid: str, clicked: list[list[float]], model: YOLO, color_model: YOLO, board: Board) -> Reading:
