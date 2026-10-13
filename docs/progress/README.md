@@ -167,13 +167,14 @@ Takeaways:
 - Both bad labels were automatic pre-labels. Review catches most of these, but not all, especially when the background resembles another player's color (sea vs blue, warm light vs orange).
 - Checks that come from the domain, like the road rule here or the token counts in deduction, catch errors that the data alone can't. The road rule is a good candidate for a permanent check that flags suspicious pieces in the pipeline.
 
-### Tested, not adopted: rescuing low-confidence roads
+### Tested, not adopted (later adopted): rescuing low-confidence roads
 
 test01 is missing one road: the detector saw it at only 14% confidence (below the 25% cutoff) because a settlement hides half of it, in a room the detector never trained on.
 
 - Lowering the cutoff globally recovers nothing on the 57 labeled photos (the same 2 pieces are missed at every cutoff from 25% down to 5%) while false pieces rise from 7 to 14.
 - A targeted rule was tested instead: accept a 10-25% road only if its edge is empty and both ends touch a piece of the same color. It recovers exactly the test01 road and never fires on the 57 labeled photos (0 false pieces).
 - Not adopted yet: it is safe, but one rescued road is not enough evidence that it matters. Worth revisiting once there are more photos from new rooms.
+- Adopted after the unseen test showed the same failure again; see "Road rescue" at the end.
 
 ## Automatic corners and read_board
 
@@ -288,3 +289,31 @@ Four photos never used for training or validation, with the true score of every 
 How much to trust it: 4 photos is a small sample, all in the Round 4 room (new layouts and game states, but a familiar setting), and two share a layout. Neither error was tuned away: raising the confidence cutoff would remove the phantom piece, but that is fitting to one photo, and the earlier cutoff sweep showed it trades false pieces for missed ones.
 
 `unseen_test04.jpg`: a fully correct photo and its regenerated board. `unseen_test_errors.jpg`: the pieces behind the two wrong scores.
+
+## Road rescue: roads hidden behind buildings
+
+test04's scores were right, but its board was not: a white road on the left coast, mostly hidden behind a white settlement, was missing. The detector saw it at 24% confidence, just under the 25% cutoff. It is the same failure as test01's road (14%, also behind a settlement), so the rule tested earlier was adopted.
+
+The rule, in `snap.py`: the detector runs once at 10%. Everything at 25% or more is used as before. A road between 10% and 25% is kept only if its edge is empty and both of its ends touch a piece of the same color (a building on that corner, or a road ending there). Weak settlements, cities, and robbers are never rescued. Ends are checked only against confident pieces, so two weak roads can't vouch for each other.
+
+| set | weak road candidates | rescued | real (matches a labeled road) | fake |
+|---|---|---|---|---|
+| 98 photos with clicked corners | 116 | 2 | 2 | 0 |
+| test01-05, automatic corners | 8 | 1 (test04 white) | 1 | 0 |
+
+- The two rescues on labeled photos (round04_06 orange, round05_08 red, both 16%) are real roads the confident pass missed. These are training photos, so they are weaker evidence than test04.
+- Scores are unchanged on all 5 test photos and nobody gains Longest Road. test02 and test05 keep their building errors, which a road rule can't fix.
+- test01's road no longer needs rescuing: catan_v3 finds it above the cutoff.
+
+### Why both ends, not one
+
+The game only requires a road to touch its own color at one end, so the simpler rule was measured too:
+
+| rule | rescued | real | fake |
+|---|---|---|---|
+| both ends (adopted) | 2 | 2 | 0 |
+| one end (the game rule) | 4 | 2 | 2 (IMG_8623 blue, round04_11 white) |
+
+One end found no extra real roads and added two fake ones. The rule is not asking "would a road be legal here" but "is this weak box really a road". Every settlement has open edges next to it, so a blurry box beside one passes the one-end check easily. A road hidden behind a building is almost always in the middle of a chain, with the building on one side and the player's next road on the other. The cost: a hidden road at the very end of a chain won't be rescued. That hasn't happened yet, and a missing road is cheaper than a fake one, which can change Longest Road.
+
+`road_rescue_test04.jpg`: the hidden road in the photo, the board before, and the board after.
