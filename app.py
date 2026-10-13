@@ -15,7 +15,7 @@ from pipeline.corners import clockwise_from_top, is_convex_hexagon
 from pipeline.read_board import BoardResult, Models, load_models, read_board
 from pipeline.rectify import CANVAS, TILE_SIZE
 from pipeline.render import SEA_BGR, render_board
-from pipeline.score import PLAYERS, score
+from pipeline.score import BUILDING_POINTS, LONGEST_ROAD_POINTS, PLAYERS, score
 from pipeline.snap import PLAYER_BGR, Placement
 
 logger = logging.getLogger("catan_app")
@@ -47,6 +47,16 @@ CSS = f"""
 #info .scores {{ display: flex; flex-wrap: wrap; gap: 4px 16px; font-size: 1.05rem; font-weight: 600; }}
 #info .dot {{ display: inline-block; width: 0.8em; height: 0.8em; border-radius: 50%; border: 1px solid #555; margin-right: 4px; }}
 #info .notes {{ font-size: 0.8rem; opacity: 0.75; margin-top: 4px; }}
+#info .breakdown {{ width: 100%; border-collapse: collapse; font-size: 0.9rem; table-layout: fixed; border: none !important; }}
+#info .breakdown th, #info .breakdown td {{ padding: 5px 2px !important; text-align: center; vertical-align: middle;
+  border: none !important; border-bottom: 1px solid rgba(128, 128, 128, 0.3) !important; background: none !important; }}
+#info .breakdown thead th {{ font-size: 0.68rem; font-weight: 500; opacity: 0.7; line-height: 1.2; }}
+#info .breakdown thead th:first-child, #info .breakdown tbody th {{ width: 30%; }}
+#info .breakdown tbody th {{ text-align: left; white-space: nowrap; overflow: hidden; }}
+#info .breakdown .n {{ display: block; font-weight: 600; }}
+#info .breakdown .sub {{ display: block; font-size: 0.68rem; opacity: 0.7; }}
+#info .breakdown .won .n {{ color: #f5b400; }}
+#info .breakdown .total {{ font-size: 1.25rem; font-weight: 700; }}
 """
 
 VIEW_NAMES = ["photo", "taps", "editor", "stage", "info", "state", "undo", "read_corners", "fix", "edit", "new",
@@ -132,16 +142,42 @@ def css_color(color: str) -> str:
     return f"rgb({r}, {g}, {b})"
 
 
+def notes_html(session: Session) -> str:
+    edited = [f"{session.edits} edit(s) by hand"] if session.edits else []
+    notes = " · ".join(session.result.warnings + edited + [f"read in {session.seconds:.1f} s"])
+    return f'<div class="notes">{notes}</div>'
+
+
 def scores_html(session: Session) -> str:
-    result = session.result
     players = "".join(
         f'<span><span class="dot" style="background:{css_color(s.color)}"></span>{s.color} {s.points}'
         f'{" (Longest Road)" if s.has_longest_road else ""}</span>'
-        for s in result.scores
+        for s in session.result.scores
     ) or "<span>No pieces found on the board</span>"
-    edited = [f"{session.edits} edit(s) by hand"] if session.edits else []
-    notes = " · ".join(result.warnings + edited + [f"read in {session.seconds:.1f} s"])
-    return f'<div class="scores">{players}</div><div class="notes">{notes}</div>'
+    return f'<div class="scores">{players}</div>{notes_html(session)}'
+
+
+def cell(count: int, points: int, unit: str) -> str:
+    earned = f"+{points}" if points else "0"
+    return f'<td><span class="n">{count}</span><span class="sub">{earned} {unit}</span></td>'
+
+
+def breakdown_html(session: Session) -> str:
+    scores = session.result.scores
+    if not scores:
+        return f'<div class="scores">No pieces found on the board</div>{notes_html(session)}'
+    rows = []
+    for s in scores:
+        bonus = LONGEST_ROAD_POINTS if s.has_longest_road else 0
+        road = (f'<td class="{"won" if bonus else ""}"><span class="n">{s.longest_road}{" ★" if bonus else ""}</span>'
+                f'<span class="sub">{f"+{bonus}" if bonus else "0"} pts</span></td>')
+        rows.append(f'<tr><th><span class="n"><span class="dot" style="background:{css_color(s.color)}"></span>'
+                    f'{s.color}</span><span class="sub">{s.roads} road pieces</span></th>'
+                    f'{cell(s.settlements, s.settlements * BUILDING_POINTS["settlement"], "pts")}'
+                    f'{cell(s.cities, s.cities * BUILDING_POINTS["city"], "pts")}{road}'
+                    f'<td class="total">{s.points}</td></tr>')
+    header = "<tr><th></th><th>Settle&shy;ments</th><th>Cities</th><th>Longest road</th><th>Total</th></tr>"
+    return f'<table class="breakdown"><thead>{header}</thead><tbody>{"".join(rows)}</tbody></table>{notes_html(session)}'
 
 
 def tap_info(session: Session, message: str = "") -> str:
@@ -227,7 +263,7 @@ def tap_view(session: Session, message: str = "") -> tuple:
 
 
 def result_view(session: Session) -> tuple:
-    return view(stage=gr.update(value=stage_html(session), visible=True), info=scores_html(session), state=session,
+    return view(stage=gr.update(value=stage_html(session), visible=True), info=breakdown_html(session), state=session,
                 fix=gr.update(visible=True), edit=gr.update(visible=True), new=gr.update(visible=True))
 
 
@@ -327,7 +363,9 @@ def on_click_save(session: Session | None, piece: str | None, color: str | None)
     if color not in PLAYERS:
         return edit_view(session, "Pick a color first.")
     kind, target = session.selected
-    new_piece = piece if kind == "vertex" and piece in BUILDINGS else "road"
+    if kind == "vertex" and piece not in BUILDINGS:
+        return edit_view(session, "Pick settlement or city first.")
+    new_piece = piece if kind == "vertex" else "road"
     current = placement_at(session, session.selected)
     placements = [p for p in session.result.placements if p is not current]
     placements.append(Placement(new_piece, 1.0, kind, target, 0.0, color))
